@@ -26,6 +26,7 @@ import {
   FolderOpen,
   Download,
   UserPlus,
+  Menu,
 } from "lucide-react"
 
 import type { BusinessUnitItem } from "@/types/business-unit-types"
@@ -35,6 +36,7 @@ import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/component
 import { ScrollArea } from "@/components/ui/scroll-area"
 import { Separator } from "@/components/ui/separator"
 import { Badge } from "@/components/ui/badge"
+import { Sheet, SheetContent, SheetTrigger, SheetHeader, SheetTitle } from "@/components/ui/sheet"
 import BusinessUnitSwitcher from "./business-unit-swticher"
 import UserProfileLogout from "./user-profile-logout"
 import { usePermissions } from "@/context/business-unit-context"
@@ -266,10 +268,11 @@ interface SidebarLinkProps {
   hasRole: (roleName: string) => boolean
   hasAnyRole: (roleNames: string[]) => boolean
   isAdmin: boolean
+  onNavigate?: () => void
 }
 
 // Sidebar Link Component
-function SidebarLink({ item, businessUnitId, depth = 0, hasPermission, hasRole, hasAnyRole, isAdmin }: SidebarLinkProps) {
+function SidebarLink({ item, businessUnitId, depth = 0, hasPermission, hasRole, hasAnyRole, isAdmin, onNavigate }: SidebarLinkProps) {
   const pathname = usePathname()
   
   // Check permissions at the top level to avoid conditional hook calls
@@ -305,6 +308,10 @@ function SidebarLink({ item, businessUnitId, depth = 0, hasPermission, hasRole, 
 
   const href = item.href ? `/${businessUnitId}${item.href}` : ""
   const isActive = pathname === href
+
+  const handleLinkClick = () => {
+    if (onNavigate) onNavigate()
+  }
 
   if (item.children) {
     // Filter children based on permissions
@@ -356,6 +363,7 @@ function SidebarLink({ item, businessUnitId, depth = 0, hasPermission, hasRole, 
               hasRole={hasRole}
               hasAnyRole={hasAnyRole}
               isAdmin={isAdmin}
+              onNavigate={onNavigate}
             />
           ))}
         </CollapsibleContent>
@@ -372,6 +380,7 @@ function SidebarLink({ item, businessUnitId, depth = 0, hasPermission, hasRole, 
         depth > 0 && "ml-4",
         isActive && "bg-accent text-accent-foreground font-medium"
       )}
+      onClick={handleLinkClick}
     >
       <Link href={href}>
         <item.icon size={16} className="mr-2 shrink-0" />
@@ -394,7 +403,8 @@ function NavigationSection({
   hasPermission,
   hasRole,
   hasAnyRole,
-  isAdmin
+  isAdmin,
+  onNavigate
 }: { 
   title: string
   items: NavItem[]
@@ -403,6 +413,7 @@ function NavigationSection({
   hasRole: (roleName: string) => boolean
   hasAnyRole: (roleNames: string[]) => boolean
   isAdmin: boolean
+  onNavigate?: () => void
 }) {
   // Filter items based on permissions
   const visibleItems = useMemo(() => {
@@ -434,6 +445,7 @@ function NavigationSection({
             hasRole={hasRole}
             hasAnyRole={hasAnyRole}
             isAdmin={isAdmin}
+            onNavigate={onNavigate}
           />
         ))}
       </div>
@@ -441,8 +453,110 @@ function NavigationSection({
   )
 }
 
-// Main Sidebar Component
+// Mobile Sidebar Component (separate from desktop)
 // eslint-disable-next-line @typescript-eslint/no-unused-vars
+export function MobileSidebar({ businessUnitId, businessUnits, currentUser }: SidebarProps) {
+  const [open, setOpen] = useState(false)
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  const { isAdmin, userRole, hasPermission, hasRole, hasAnyRole } = usePermissions()
+
+  // Determine if user should see management sections
+  const canViewManagement = isAdmin || hasAnyRole([
+    'Property Manager', 
+    'Property Supervisor', 
+    'Finance Manager', 
+    'Legal Officer'
+  ]) || hasPermission('users:read') || hasPermission('business_units:read')
+
+  const handleNavigate = () => {
+    setOpen(false)
+  }
+
+  return (
+    <Sheet open={open} onOpenChange={setOpen}>
+      <SheetTrigger asChild>
+        <Button
+          variant="ghost"
+          size="sm"
+          className="h-9 w-9 p-0 lg:hidden"
+        >
+          <Menu className="h-4 w-4" />
+          <span className="sr-only">Toggle sidebar</span>
+        </Button>
+      </SheetTrigger>
+      <SheetContent side="left" className="w-64 p-0">
+        <SheetHeader className="sr-only">
+          <SheetTitle>Navigation Menu</SheetTitle>
+        </SheetHeader>
+        <div className="flex flex-col h-full bg-background">
+          {/* Header - Business Unit Switcher */}
+          <div className="p-4">
+            <BusinessUnitSwitcher items={businessUnits} />
+          </div>
+          
+          <Separator />
+
+          {/* Main Content */}
+          <ScrollArea className="flex-1 px-2">
+            <div className="space-y-4 py-4">
+              {/* Core Navigation */}
+              <NavigationSection
+                title="Overview"
+                items={navigation}
+                businessUnitId={businessUnitId}
+                hasPermission={hasPermission}
+                hasRole={hasRole}
+                hasAnyRole={hasAnyRole}
+                isAdmin={isAdmin}
+                onNavigate={handleNavigate}
+              />
+
+              <Separator className="my-4" />
+
+              {/* Management Navigation */}
+              {canViewManagement && (
+                <>
+                  <NavigationSection
+                    title="Management"
+                    items={managementNavigation}
+                    businessUnitId={businessUnitId}
+                    hasPermission={hasPermission}
+                    hasRole={hasRole}
+                    hasAnyRole={hasAnyRole}
+                    isAdmin={isAdmin}
+                    onNavigate={handleNavigate}
+                  />
+                  <Separator className="my-4" />
+                </>
+              )}
+
+              {/* System Navigation */}
+              {(isAdmin || hasRole('System Administrator')) && (
+                <NavigationSection
+                  title="System"
+                  items={systemNavigation}
+                  businessUnitId={businessUnitId}
+                  hasPermission={hasPermission}
+                  hasRole={hasRole}
+                  hasAnyRole={hasAnyRole}
+                  isAdmin={isAdmin}
+                  onNavigate={handleNavigate}
+                />
+              )}
+            </div>
+          </ScrollArea>
+
+          {/* Footer */}
+          <div className="p-4 border-t">
+            <UserProfileLogout />
+          </div>
+        </div>
+      </SheetContent>
+    </Sheet>
+  )
+}
+
+// Desktop Sidebar Component (your original design preserved)
 export function Sidebar({ businessUnitId, businessUnits, currentUser }: SidebarProps) {
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const { isAdmin, userRole, hasPermission, hasRole, hasAnyRole } = usePermissions()
@@ -456,65 +570,75 @@ export function Sidebar({ businessUnitId, businessUnits, currentUser }: SidebarP
   ]) || hasPermission('users:read') || hasPermission('business_units:read')
 
   return (
-    <div className="flex flex-col h-full w-64 bg-background border-r">
-      {/* Header - Business Unit Switcher */}
-      <div className="p-4">
-        <BusinessUnitSwitcher items={businessUnits} />
-      </div>
-      
-      <Separator />
+    <>
+      {/* Desktop Sidebar - exactly as your original */}
+      <div className="hidden lg:flex flex-col h-full w-64 bg-background border-r">
+        {/* Header - Business Unit Switcher */}
+        <div className="p-4">
+          <BusinessUnitSwitcher items={businessUnits} />
+        </div>
+        
+        <Separator />
 
-      {/* Main Content */}
-      <ScrollArea className="flex-1 px-2">
-        <div className="space-y-4 py-4">
-          {/* Core Navigation */}
-          <NavigationSection
-            title="Overview"
-            items={navigation}
-            businessUnitId={businessUnitId}
-            hasPermission={hasPermission}
-            hasRole={hasRole}
-            hasAnyRole={hasAnyRole}
-            isAdmin={isAdmin}
-          />
-
-          <Separator className="my-4" />
-
-          {/* Management Navigation - For users with management permissions */}
-          {canViewManagement && (
-            <>
-              <NavigationSection
-                title="Management"
-                items={managementNavigation}
-                businessUnitId={businessUnitId}
-                hasPermission={hasPermission}
-                hasRole={hasRole}
-                hasAnyRole={hasAnyRole}
-                isAdmin={isAdmin}
-              />
-              <Separator className="my-4" />
-            </>
-          )}
-
-          {/* System Navigation - Only for System Administrators */}
-          {(isAdmin || hasRole('System Administrator')) && (
+        {/* Main Content */}
+        <ScrollArea className="flex-1 px-2">
+          <div className="space-y-4 py-4">
+            {/* Core Navigation */}
             <NavigationSection
-              title="System"
-              items={systemNavigation}
+              title="Overview"
+              items={navigation}
               businessUnitId={businessUnitId}
               hasPermission={hasPermission}
               hasRole={hasRole}
               hasAnyRole={hasAnyRole}
               isAdmin={isAdmin}
             />
-          )}
-        </div>
-      </ScrollArea>
 
-      {/* Footer - User Profile */}
-      <div className="p-4 border-t">
-        <UserProfileLogout />
+            <Separator className="my-4" />
+
+            {/* Management Navigation */}
+            {canViewManagement && (
+              <>
+                <NavigationSection
+                  title="Management"
+                  items={managementNavigation}
+                  businessUnitId={businessUnitId}
+                  hasPermission={hasPermission}
+                  hasRole={hasRole}
+                  hasAnyRole={hasAnyRole}
+                  isAdmin={isAdmin}
+                />
+                <Separator className="my-4" />
+              </>
+            )}
+
+            {/* System Navigation */}
+            {(isAdmin || hasRole('System Administrator')) && (
+              <NavigationSection
+                title="System"
+                items={systemNavigation}
+                businessUnitId={businessUnitId}
+                hasPermission={hasPermission}
+                hasRole={hasRole}
+                hasAnyRole={hasAnyRole}
+                isAdmin={isAdmin}
+              />
+            )}
+          </div>
+        </ScrollArea>
+
+        {/* Footer */}
+        <div className="p-4 border-t">
+          <UserProfileLogout />
+        </div>
       </div>
-    </div>
+
+      {/* Mobile Sidebar */}
+      <MobileSidebar 
+        businessUnitId={businessUnitId}
+        businessUnits={businessUnits}
+        currentUser={currentUser}
+      />
+    </>
   )
 }

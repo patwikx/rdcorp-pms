@@ -22,16 +22,15 @@ import {
 } from '@/components/ui/dropdown-menu';
 import { 
   MoreHorizontal, 
-  Eye, 
-  Edit, 
+  Eye,  
   Trash2, 
   ArrowUpDown,
   ArrowUp,
   ArrowDown,
-  FileText,
   MapPin,
   User,
-  Calendar
+  Calendar,
+  Building2,
 } from 'lucide-react';
 import type { PropertyListItem, PropertySort } from '@/types/property-types';
 import { PropertyClassification, PropertyStatus } from '@prisma/client';
@@ -42,7 +41,6 @@ interface PropertyTableProps {
   sort: PropertySort;
   onSortChange: (sort: PropertySort) => void;
   onViewProperty: (propertyId: string) => void;
-  onEditProperty: (propertyId: string) => void;
   onDeleteProperty: (propertyId: string) => void;
   canEdit: boolean;
   canDelete: boolean;
@@ -53,9 +51,7 @@ export function PropertyTable({
   sort,
   onSortChange,
   onViewProperty,
-  onEditProperty,
   onDeleteProperty,
-  canEdit,
   canDelete,
 }: PropertyTableProps) {
   const handleSort = (field: PropertySort['field']) => {
@@ -71,27 +67,27 @@ export function PropertyTable({
 
   const getSortIcon = (field: PropertySort['field']) => {
     if (sort.field !== field) {
-      return <ArrowUpDown className="h-4 w-4" />;
+      return <ArrowUpDown className="h-4 w-4 ml-2 text-muted-foreground" />;
     }
     return sort.order === 'asc' ? 
-      <ArrowUp className="h-4 w-4" /> : 
-      <ArrowDown className="h-4 w-4" />;
+      <ArrowUp className="h-4 w-4 ml-2 text-blue-600" /> : 
+      <ArrowDown className="h-4 w-4 ml-2 text-blue-600" />;
   };
 
   const getStatusBadge = (status: PropertyStatus) => {
-    const variants: Record<PropertyStatus, { variant: 'default' | 'secondary' | 'destructive' | 'outline'; className?: string }> = {
-      ACTIVE: { variant: 'default', className: 'bg-green-100 text-green-800 hover:bg-green-100' },
-      INACTIVE: { variant: 'secondary' },
-      PENDING: { variant: 'default', className: 'bg-yellow-100 text-yellow-800 hover:bg-yellow-100' },
-      RELEASED: { variant: 'default', className: 'bg-blue-100 text-blue-800 hover:bg-blue-100' },
-      RETURNED: { variant: 'default', className: 'bg-purple-100 text-purple-800 hover:bg-purple-100' },
-      UNDER_REVIEW: { variant: 'default', className: 'bg-orange-100 text-orange-800 hover:bg-orange-100' },
-      DISPUTED: { variant: 'destructive' },
+    const variants: Record<PropertyStatus, { className: string }> = {
+      ACTIVE: { className: 'bg-green-100 text-green-800 hover:bg-green-100 border-green-200' },
+      INACTIVE: { className: 'bg-gray-100 text-gray-800 hover:bg-gray-100 border-gray-200' },
+      PENDING: { className: 'bg-yellow-100 text-yellow-800 hover:bg-yellow-100 border-yellow-200' },
+      RELEASED: { className: 'bg-blue-100 text-blue-800 hover:bg-blue-100 border-blue-200' },
+      RETURNED: { className: 'bg-purple-100 text-purple-800 hover:bg-purple-100 border-purple-200' },
+      UNDER_REVIEW: { className: 'bg-orange-100 text-orange-800 hover:bg-orange-100 border-orange-200' },
+      DISPUTED: { className: 'bg-red-100 text-red-800 hover:bg-red-100 border-red-200' },
     };
 
     const config = variants[status];
     return (
-      <Badge variant={config.variant} className={config.className}>
+      <Badge className={`${config.className} font-medium`}>
         {status.replace('_', ' ')}
       </Badge>
     );
@@ -99,18 +95,18 @@ export function PropertyTable({
 
   const getClassificationBadge = (classification: PropertyClassification) => {
     const colors: Record<PropertyClassification, string> = {
-      RESIDENTIAL: 'bg-blue-50 text-blue-700 border-blue-200',
-      COMMERCIAL: 'bg-green-50 text-green-700 border-green-200',
-      INDUSTRIAL: 'bg-gray-50 text-gray-700 border-gray-200',
-      AGRICULTURAL: 'bg-emerald-50 text-emerald-700 border-emerald-200',
-      INSTITUTIONAL: 'bg-purple-50 text-purple-700 border-purple-200',
-      MIXED_USE: 'bg-indigo-50 text-indigo-700 border-indigo-200',
-      VACANT_LOT: 'bg-yellow-50 text-yellow-700 border-yellow-200',
-      OTHER: 'bg-slate-50 text-slate-700 border-slate-200',
+      RESIDENTIAL: 'bg-blue-50 text-blue-700 border-blue-200 hover:bg-blue-50',
+      COMMERCIAL: 'bg-green-50 text-green-700 border-green-200 hover:bg-green-50',
+      INDUSTRIAL: 'bg-gray-50 text-gray-700 border-gray-200 hover:bg-gray-50',
+      AGRICULTURAL: 'bg-emerald-50 text-emerald-700 border-emerald-200 hover:bg-emerald-50',
+      INSTITUTIONAL: 'bg-purple-50 text-purple-700 border-purple-200 hover:bg-purple-50',
+      MIXED_USE: 'bg-indigo-50 text-indigo-700 border-indigo-200 hover:bg-indigo-50',
+      VACANT_LOT: 'bg-yellow-50 text-yellow-700 border-yellow-200 hover:bg-yellow-50',
+      OTHER: 'bg-slate-50 text-slate-700 border-slate-200 hover:bg-slate-50',
     };
 
     return (
-      <Badge variant="outline" className={colors[classification]}>
+      <Badge variant="outline" className={`${colors[classification]} font-medium`}>
         {classification.replace('_', ' ')}
       </Badge>
     );
@@ -130,10 +126,12 @@ export function PropertyTable({
   if (properties.length === 0) {
     return (
       <div className="text-center py-12">
-        <FileText className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
-        <h3 className="text-lg font-medium text-muted-foreground mb-2">No properties found</h3>
-        <p className="text-sm text-muted-foreground">
-          Try adjusting your search criteria or add a new property.
+        <div className="mx-auto w-24 h-24 bg-muted rounded-full flex items-center justify-center mb-6">
+          <Building2 className="h-12 w-12 text-muted-foreground" />
+        </div>
+        <h3 className="text-xl font-semibold text-foreground mb-2">No properties found</h3>
+        <p className="text-muted-foreground max-w-md mx-auto">
+          No properties match your current search criteria. Try adjusting your filters or add a new property to get started.
         </p>
       </div>
     );
@@ -143,64 +141,64 @@ export function PropertyTable({
     <div className="rounded-md border">
       <Table>
         <TableHeader>
-          <TableRow>
-            <TableHead>
+          <TableRow className="hover:bg-transparent">
+            <TableHead className="font-semibold">
               <Button
                 variant="ghost"
                 onClick={() => handleSort('titleNumber')}
-                className="h-auto p-0 font-medium hover:bg-transparent"
+                className="h-auto p-0 font-semibold hover:bg-transparent hover:text-blue-600 transition-colors"
               >
                 Title Number
                 {getSortIcon('titleNumber')}
               </Button>
             </TableHead>
-            <TableHead>
+            <TableHead className="font-semibold">
               <Button
                 variant="ghost"
                 onClick={() => handleSort('lotNumber')}
-                className="h-auto p-0 font-medium hover:bg-transparent"
+                className="h-auto p-0 font-semibold hover:bg-transparent hover:text-blue-600 transition-colors"
               >
                 Lot Number
                 {getSortIcon('lotNumber')}
               </Button>
             </TableHead>
-            <TableHead>
+            <TableHead className="font-semibold">
               <Button
                 variant="ghost"
                 onClick={() => handleSort('location')}
-                className="h-auto p-0 font-medium hover:bg-transparent"
+                className="h-auto p-0 font-semibold hover:bg-transparent hover:text-blue-600 transition-colors"
               >
                 Location
                 {getSortIcon('location')}
               </Button>
             </TableHead>
-            <TableHead>
+            <TableHead className="font-semibold text-center">
               <Button
                 variant="ghost"
                 onClick={() => handleSort('area')}
-                className="h-auto p-0 font-medium hover:bg-transparent"
+                className="h-auto p-0 font-semibold hover:bg-transparent hover:text-blue-600 transition-colors"
               >
                 Area (sqm)
                 {getSortIcon('area')}
               </Button>
             </TableHead>
-            <TableHead>
+            <TableHead className="font-semibold">
               <Button
                 variant="ghost"
                 onClick={() => handleSort('registeredOwner')}
-                className="h-auto p-0 font-medium hover:bg-transparent"
+                className="h-auto p-0 font-semibold hover:bg-transparent hover:text-blue-600 transition-colors"
               >
                 Owner
                 {getSortIcon('registeredOwner')}
               </Button>
             </TableHead>
-            <TableHead>Classification</TableHead>
-            <TableHead>Status</TableHead>
-            <TableHead>
+            <TableHead className="font-semibold">Classification</TableHead>
+            <TableHead className="font-semibold">Status</TableHead>
+            <TableHead className="font-semibold">
               <Button
                 variant="ghost"
                 onClick={() => handleSort('createdAt')}
-                className="h-auto p-0 font-medium hover:bg-transparent"
+                className="h-auto p-0 font-semibold hover:bg-transparent hover:text-blue-600 transition-colors"
               >
                 Created
                 {getSortIcon('createdAt')}
@@ -211,18 +209,23 @@ export function PropertyTable({
         </TableHeader>
         <TableBody>
           {properties.map((property) => (
-            <TableRow key={property.id} className="hover:bg-muted/50">
+            <TableRow key={property.id} className="hover:bg-muted/50 transition-colors">
               <TableCell className="font-medium">
                 <div className="flex items-center space-x-2">
-                  <span>{property.titleNumber}</span>
+                  <button
+                    onClick={() => onViewProperty(property.id)}
+                    className="font-semibold text-blue-700 hover:text-blue-800 hover:underline transition-colors"
+                  >
+                    {property.titleNumber}
+                  </button>
                   {property._count.documents > 0 && (
-                    <Badge variant="outline" className="text-xs">
+                    <Badge variant="outline" className="text-xs bg-blue-50 text-blue-600 border-blue-200">
                       {property._count.documents} docs
                     </Badge>
                   )}
                 </div>
               </TableCell>
-              <TableCell>{property.lotNumber}</TableCell>
+              <TableCell className="font-medium">{property.lotNumber}</TableCell>
               <TableCell>
                 <div className="flex items-center space-x-1 max-w-[200px]">
                   <MapPin className="h-3 w-3 text-muted-foreground flex-shrink-0" />
@@ -231,7 +234,7 @@ export function PropertyTable({
                   </span>
                 </div>
               </TableCell>
-              <TableCell className="text-right">
+              <TableCell className="text-center font-semibold">
                 {formatArea(property.area)}
               </TableCell>
               <TableCell>
@@ -260,23 +263,17 @@ export function PropertyTable({
               <TableCell>
                 <DropdownMenu>
                   <DropdownMenuTrigger asChild>
-                    <Button variant="ghost" className="h-8 w-8 p-0">
+                    <Button variant="ghost" className="h-8 w-8 p-0 hover:bg-muted transition-colors">
                       <span className="sr-only">Open menu</span>
                       <MoreHorizontal className="h-4 w-4" />
                     </Button>
                   </DropdownMenuTrigger>
-                  <DropdownMenuContent align="end">
-                    <DropdownMenuLabel>Actions</DropdownMenuLabel>
+                  <DropdownMenuContent align="end" className="w-48">
+                    <DropdownMenuLabel className="font-semibold">Actions</DropdownMenuLabel>
                     <DropdownMenuItem onClick={() => onViewProperty(property.id)}>
-                      <Eye className="mr-2 h-4 w-4" />
-                      View Details
+                      <Eye className="mr-2 h-4 w-4 text-blue-600" />
+                      View & Edit
                     </DropdownMenuItem>
-                    {canEdit && (
-                      <DropdownMenuItem onClick={() => onEditProperty(property.id)}>
-                        <Edit className="mr-2 h-4 w-4" />
-                        Edit Property
-                      </DropdownMenuItem>
-                    )}
                     <DropdownMenuSeparator />
                     {canDelete && (
                       <DropdownMenuItem 
