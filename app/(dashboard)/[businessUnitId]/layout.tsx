@@ -6,11 +6,6 @@ import { BusinessUnitProvider } from "@/context/business-unit-context";
 import type { UserAssignment } from "@/next-auth";
 import { Sidebar } from "@/components/new-sidebar";
 
-interface BusinessUnitItem {
-  id: string;
-  name: string;
-  description: string | null;
-}
 
 interface BusinessUnitLayoutProps {
   children: React.ReactNode;

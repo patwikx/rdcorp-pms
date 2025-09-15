@@ -77,6 +77,8 @@ model User {
   returns             PropertyReturn[]     @relation("ReturnedBy")
   receivedReturns     PropertyReturn[]     @relation("ReturnReceivedBy")
   auditLogs           AuditLog[]
+  createdDocuments    Document[]           @relation("DocumentCreator")
+  updatedDocuments    Document[]           @relation("DocumentUpdater")
 
   @@map("users")
 }
@@ -161,8 +163,89 @@ model Property {
   turnovers    PropertyTurnover[]
   returns      PropertyReturn[]
   auditLogs    AuditLog[]
+  rptRecords   RealPropertyTax[]
+  documents    Document[]
 
   @@map("properties")
+}
+
+// Real Property Tax Management
+model RealPropertyTax {
+  id                   String              @id @default(uuid())
+  propertyId           String              @map("property_id")
+  taxYear              Int                 @map("tax_year")
+  assessedValue        Decimal             @map("assessed_value") @db.Decimal(15, 2)
+  taxRate              Decimal             @map("tax_rate") @db.Decimal(5, 4) // Percentage as decimal (e.g., 0.02 for 2%)
+  basicTax             Decimal             @map("basic_tax") @db.Decimal(15, 2)
+  specialEducationFund Decimal?            @map("special_education_fund") @db.Decimal(15, 2)
+  penalty              Decimal?            @default(0) @db.Decimal(15, 2)
+  discount             Decimal?            @default(0) @db.Decimal(15, 2)
+  totalAmountDue       Decimal             @map("total_amount_due") @db.Decimal(15, 2)
+  paymentSchedule      PaymentScheduleType @map("payment_schedule")
+  dueDate              DateTime            @map("due_date")
+  status               RPTStatus           @default(UNPAID)
+  remarks              String?             @db.Text
+  createdAt            DateTime            @default(now()) @map("created_at")
+  updatedAt            DateTime            @updatedAt @map("updated_at")
+
+  // Relations
+  property  Property     @relation(fields: [propertyId], references: [id], onDelete: Cascade)
+  payments  RPTPayment[]
+  documents Document[]
+
+  @@unique([propertyId, taxYear, paymentSchedule])
+  @@map("real_property_taxes")
+}
+
+// RPT Payment Records
+model RPTPayment {
+  id              String   @id @default(uuid())
+  rptId           String   @map("rpt_id")
+  paymentDate     DateTime @map("payment_date")
+  amountPaid      Decimal  @map("amount_paid") @db.Decimal(15, 2)
+  paymentMethod   String   @map("payment_method") // CASH, CHECK, ONLINE, BANK_TRANSFER, etc.
+  referenceNumber String?  @map("reference_number")
+  receiptNumber   String?  @map("receipt_number")
+  remarks         String?  @db.Text
+  createdAt       DateTime @default(now()) @map("created_at")
+
+  // Relations
+  realPropertyTax RealPropertyTax @relation(fields: [rptId], references: [id], onDelete: Cascade)
+  documents       Document[]
+
+  @@map("rpt_payments")
+}
+
+// Document Management
+model Document {
+  id           String       @id @default(uuid())
+  fileName     String       @map("file_name")
+  originalName String       @map("original_name")
+  fileSize     Int          @map("file_size") // Size in bytes
+  mimeType     String       @map("mime_type")
+  filePath     String       @map("file_path") // Storage path or URL
+  documentType DocumentType @map("document_type")
+  description  String?      @db.Text
+
+  // Polymorphic relations - only one should be set
+  propertyId   String? @map("property_id")
+  rptId        String? @map("rpt_id")
+  rptPaymentId String? @map("rpt_payment_id")
+
+  isActive    Boolean  @default(true) @map("is_active")
+  createdById String   @map("created_by_id")
+  updatedById String?  @map("updated_by_id")
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  // Relations
+  property        Property?        @relation(fields: [propertyId], references: [id], onDelete: Cascade)
+  realPropertyTax RealPropertyTax? @relation(fields: [rptId], references: [id], onDelete: Cascade)
+  rptPayment      RPTPayment?      @relation(fields: [rptPaymentId], references: [id], onDelete: Cascade)
+  createdBy       User             @relation("DocumentCreator", fields: [createdById], references: [id])
+  updatedBy       User?            @relation("DocumentUpdater", fields: [updatedById], references: [id])
+
+  @@map("documents")
 }
 
 // Property Approval System
@@ -305,4 +388,52 @@ enum ApprovalStatus {
   EXPIRED
 
   @@map("approval_status")
+}
+
+enum PaymentScheduleType {
+  QUARTERLY_Q1 // First Quarter
+  QUARTERLY_Q2 // Second Quarter
+  QUARTERLY_Q3 // Third Quarter
+  QUARTERLY_Q4 // Fourth Quarter
+  ANNUAL // Full Year
+  SEMI_ANNUAL_H1 // First Half
+  SEMI_ANNUAL_H2 // Second Half
+
+  @@map("payment_schedule_type")
+}
+
+enum RPTStatus {
+  UNPAID
+  PARTIALLY_PAID
+  FULLY_PAID
+  OVERDUE
+  DISPUTED
+  WAIVED
+
+  @@map("rpt_status")
+}
+
+enum DocumentType {
+  // Property Documents
+  TITLE_DEED
+  TAX_DECLARATION
+  SURVEY_PLAN
+  LOCATION_MAP
+  PHOTOS
+  APPRAISAL_REPORT
+  MORTGAGE_DOCUMENT
+
+  // RPT Documents
+  TAX_BILL
+  PAYMENT_RECEIPT
+  TAX_CLEARANCE
+  ASSESSMENT_NOTICE
+
+  // General Documents
+  CORRESPONDENCE
+  LEGAL_DOCUMENT
+  COMPLIANCE_CERTIFICATE
+  OTHER
+
+  @@map("document_type")
 }
