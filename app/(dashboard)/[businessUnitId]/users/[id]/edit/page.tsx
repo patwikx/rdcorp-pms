@@ -3,10 +3,10 @@ import React from 'react';
 import { redirect, notFound } from 'next/navigation';
 import { auth } from '@/auth';
 import { getUserById } from '@/lib/actions/users-actions';
-import { UserDetailPage } from '@/components/users/user-detail-page';
+import { UserForm } from '@/components/users/user-form';
 import { Breadcrumb, BreadcrumbItem, BreadcrumbLink, BreadcrumbList, BreadcrumbPage, BreadcrumbSeparator } from '@/components/ui/breadcrumb';
 import Link from 'next/link';
-import { Users, Eye, Home } from 'lucide-react';
+import { Users, Edit, Home } from 'lucide-react';
 
 interface EditUserPageProps {
   params: Promise<{ businessUnitId: string; id: string }>;
@@ -66,8 +66,8 @@ export default async function EditUserPage({ params }: EditUserPageProps) {
             <BreadcrumbSeparator />
             <BreadcrumbItem>
               <BreadcrumbPage className="flex items-center gap-1 text-sm text-slate-900 font-semibold">
-                <Eye className="h-4 w-4" />
-                {getUserName()}
+                <Edit className="h-4 w-4" />
+                Edit {getUserName()}
               </BreadcrumbPage>
             </BreadcrumbItem>
           </BreadcrumbList>
@@ -78,15 +78,15 @@ export default async function EditUserPage({ params }: EditUserPageProps) {
       <div className="mb-8">
         <div className="flex items-center justify-between">
           <div>
-            <h1 className="text-3xl font-bold tracking-tight">User Details</h1>
+            <h1 className="text-3xl font-bold tracking-tight">Edit User</h1>
             <p className="text-muted-foreground mt-2">
-              View detailed information for <span className="font-medium">{getUserName()}</span>
+              Update user information for <span className="font-medium">{getUserName()}</span>
             </p>
           </div>
         </div>
       </div>
 
-      <UserDetailPage
+      <UserForm
         businessUnitId={businessUnitId}
         user={user}
       />

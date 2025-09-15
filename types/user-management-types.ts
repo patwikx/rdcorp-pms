@@ -53,6 +53,7 @@ export interface UserFormData {
   email: string;
   password: string;
   isActive: boolean;
+  roleId?: string;
 }
 
 export interface UserAssignmentFormData {
@@ -160,4 +161,13 @@ export interface RoleStats {
   withMembers: number;
   withoutMembers: number;
   totalPermissions: number;
+}
+
+export interface ActionResult {
+  success: boolean;
+  error?: string;
+}
+
+export interface CreateUserResult extends ActionResult {
+  userId?: string;
 }

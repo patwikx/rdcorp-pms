@@ -1,18 +1,18 @@
-// app/(dashboard)/[businessUnitId]/users/[id]/edit/page.tsx
+// app/(dashboard)/[businessUnitId]/roles/[id]/edit/page.tsx
 import React from 'react';
 import { redirect, notFound } from 'next/navigation';
 import { auth } from '@/auth';
-import { getUserById } from '@/lib/actions/users-actions';
-import { UserDetailPage } from '@/components/users/user-detail-page';
+import { getRoleById } from '@/lib/actions/roles-actions';
+import { RoleForm } from '@/components/roles/role-form';
 import { Breadcrumb, BreadcrumbItem, BreadcrumbLink, BreadcrumbList, BreadcrumbPage, BreadcrumbSeparator } from '@/components/ui/breadcrumb';
 import Link from 'next/link';
-import { Users, Eye, Home } from 'lucide-react';
+import { Shield, Edit, Home } from 'lucide-react';
 
-interface EditUserPageProps {
+interface EditRolePageProps {
   params: Promise<{ businessUnitId: string; id: string }>;
 }
 
-export default async function EditUserPage({ params }: EditUserPageProps) {
+export default async function EditRolePage({ params }: EditRolePageProps) {
   const session = await auth();
   
   if (!session?.user?.id) {
@@ -30,16 +30,12 @@ export default async function EditUserPage({ params }: EditUserPageProps) {
     redirect('/setup?error=unauthorized');
   }
 
-  // Fetch user data
-  const user = await getUserById(businessUnitId, id);
+  // Fetch role data
+  const role = await getRoleById(businessUnitId, id);
 
-  if (!user) {
+  if (!role) {
     notFound();
   }
-
-  const getUserName = () => {
-    return `${user.firstName || ''} ${user.lastName || ''}`.trim() || user.email;
-  };
 
   return (
     <div className="container mx-auto py-6">
@@ -57,17 +53,17 @@ export default async function EditUserPage({ params }: EditUserPageProps) {
             <BreadcrumbSeparator />
             <BreadcrumbItem>
               <BreadcrumbLink asChild>
-                <Link href={`/${businessUnitId}/users`} className="flex items-center gap-1 text-sm text-slate-600 hover:text-blue-600 transition-colors">
-                  <Users className="h-3 w-3" />
-                  Users
+                <Link href={`/${businessUnitId}/roles`} className="flex items-center gap-1 text-sm text-slate-600 hover:text-blue-600 transition-colors">
+                  <Shield className="h-3 w-3" />
+                  Roles
                 </Link>
               </BreadcrumbLink>
             </BreadcrumbItem>
             <BreadcrumbSeparator />
             <BreadcrumbItem>
               <BreadcrumbPage className="flex items-center gap-1 text-sm text-slate-900 font-semibold">
-                <Eye className="h-4 w-4" />
-                {getUserName()}
+                <Edit className="h-4 w-4" />
+                Edit {role.name}
               </BreadcrumbPage>
             </BreadcrumbItem>
           </BreadcrumbList>
@@ -78,17 +74,17 @@ export default async function EditUserPage({ params }: EditUserPageProps) {
       <div className="mb-8">
         <div className="flex items-center justify-between">
           <div>
-            <h1 className="text-3xl font-bold tracking-tight">User Details</h1>
+            <h1 className="text-3xl font-bold tracking-tight">Edit Role</h1>
             <p className="text-muted-foreground mt-2">
-              View detailed information for <span className="font-medium">{getUserName()}</span>
+              Update role information for <span className="font-medium">{role.name}</span>
             </p>
           </div>
         </div>
       </div>
 
-      <UserDetailPage
+      <RoleForm
         businessUnitId={businessUnitId}
-        user={user}
+        role={role}
       />
     </div>
   );

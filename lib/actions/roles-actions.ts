@@ -14,6 +14,30 @@ import type {
   RoleStats,
 } from '@/types/user-management-types';
 
+// Get all roles (for dropdowns and selection)
+export async function getAllRoles(): Promise<Array<{ id: string; name: string; description: string | null }>> {
+  const session = await auth();
+  if (!session?.user?.id) {
+    throw new Error('Unauthorized');
+  }
+
+  try {
+    const roles = await prisma.role.findMany({
+      select: {
+        id: true,
+        name: true,
+        description: true,
+      },
+      orderBy: { name: 'asc' },
+    });
+
+    return roles;
+  } catch (error) {
+    console.error('Error fetching all roles:', error);
+    throw new Error('Failed to fetch roles');
+  }
+}
+
 // Get roles with pagination and filtering
 export async function getRoles(
   businessUnitId: string,

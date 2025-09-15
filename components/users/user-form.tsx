@@ -1,12 +1,13 @@
 // components/users/user-form.tsx
 'use client';
 
-import React, { useState, useTransition } from 'react';
+import React, { useTransition } from 'react';
 import { useRouter } from 'next/navigation';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { toast } from 'sonner';
+import { getAllRoles } from '@/lib/actions/roles-actions';
 
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -28,7 +29,7 @@ import {
 } from '@/components/ui/form';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Separator } from '@/components/ui/separator';
-import { createUser, updateUser } from '@/lib/actions/users-actions';
+import { createUser, updateUser, assignUserToBusinessUnit } from '@/lib/actions/users-actions';
 import { 
   Loader2, 
   Save, 
@@ -36,9 +37,11 @@ import {
   User, 
   Mail, 
   Lock,
-  Shield
+  Shield,
+  UserPlus
 } from 'lucide-react';
-import type { UserDetails } from '@/types/user-management-types';
+import type { CreateUserResult, UserDetails } from '@/types/user-management-types';
+import { useEffect, useState } from 'react';
 
 const userFormSchema = z.object({
   username: z.string().min(3, 'Username must be at least 3 characters'),
@@ -47,6 +50,7 @@ const userFormSchema = z.object({
   email: z.string().email('Invalid email address'),
   password: z.string().min(6, 'Password must be at least 6 characters'),
   isActive: z.boolean(),
+  roleId: z.string().optional(),
 });
 
 type UserFormData = z.infer<typeof userFormSchema>;
@@ -62,8 +66,27 @@ export function UserForm({ businessUnitId, user, onSuccess, onCancel }: UserForm
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [roles, setRoles] = useState<Array<{ id: string; name: string; description: string | null }>>([]);
+  const [loadingRoles, setLoadingRoles] = useState(true);
 
   const isEditMode = !!user;
+
+  // Load roles on component mount
+  useEffect(() => {
+    const loadRoles = async () => {
+      try {
+        const rolesData = await getAllRoles();
+        setRoles(rolesData);
+      } catch (error) {
+        console.error('Error loading roles:', error);
+        toast.error('Failed to load roles');
+      } finally {
+        setLoadingRoles(false);
+      }
+    };
+
+    loadRoles();
+  }, []);
 
   const form = useForm<UserFormData>({
     resolver: zodResolver(userFormSchema),
@@ -74,6 +97,8 @@ export function UserForm({ businessUnitId, user, onSuccess, onCancel }: UserForm
       email: user?.email || '',
       password: '',
       isActive: user?.isActive ?? true,
+      // Fix: Access role.id instead of roleId, and filter by businessUnit.id
+      roleId: user?.businessUnitMembers.find(m => m.businessUnit.id === businessUnitId)?.role.id || '',
     },
   });
 
@@ -87,6 +112,25 @@ export function UserForm({ businessUnitId, user, onSuccess, onCancel }: UserForm
       
       if (result.success) {
         toast.success(isEditMode ? 'User updated successfully' : 'User created successfully');
+        
+        // If creating a new user and a role is selected, assign the role
+        if (!isEditMode && data.roleId && 'userId' in result) {
+          const createResult = result as CreateUserResult;
+          if (createResult.userId) {
+            try {
+              await assignUserToBusinessUnit(createResult.userId, {
+                userId: createResult.userId,
+                businessUnitId: businessUnitId,
+                roleId: data.roleId,
+              });
+              toast.success('User role assigned successfully');
+            } catch (error) {
+              console.error('Error assigning role:', error);
+              toast.error('User created but failed to assign role');
+            }
+          }
+        }
+        
         if (onSuccess) {
           onSuccess();
         } else {
@@ -290,6 +334,51 @@ export function UserForm({ businessUnitId, user, onSuccess, onCancel }: UserForm
                     )}
                   />
                 </div>
+
+                {!isEditMode && (
+                  <FormField
+                    control={form.control}
+                    name="roleId"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel className="flex items-center gap-2">
+                          <UserPlus className="h-4 w-4" />
+                          Assign Role
+                        </FormLabel>
+                        <Select 
+                          onValueChange={field.onChange} 
+                          value={field.value}
+                          disabled={isLoading || loadingRoles}
+                        >
+                          <FormControl>
+                            <SelectTrigger className="h-11">
+                              <SelectValue placeholder="Select a role (optional)" />
+                            </SelectTrigger>
+                          </FormControl>
+                          <SelectContent>
+                            <SelectItem value="no-role">No role assigned</SelectItem>
+                            {roles.map((role) => (
+                              <SelectItem key={role.id} value={role.id}>
+                                <div className="flex flex-col">
+                                  <span className="font-medium">{role.name}</span>
+                                  {role.description && (
+                                    <span className="text-xs text-muted-foreground">
+                                      {role.description}
+                                    </span>
+                                  )}
+                                </div>
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                        <FormDescription>
+                          Assign a role to this user in the current business unit
+                        </FormDescription>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                )}
               </div>
             </CardContent>
           </Card>

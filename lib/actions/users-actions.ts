@@ -265,6 +265,18 @@ export async function createUser(
       },
     });
 
+    // If roleId is provided, create business unit assignment
+    if (data.roleId) {
+      await prisma.businessUnitMember.create({
+        data: {
+          userId: user.id,
+          businessUnitId,
+          roleId: data.roleId,
+          isActive: true,
+        },
+      });
+    }
+
     revalidatePath(`/${businessUnitId}/users`);
     return { success: true, userId: user.id };
   } catch (error) {
