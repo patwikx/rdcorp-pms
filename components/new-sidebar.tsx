@@ -3,6 +3,7 @@
 import React, { useState, useMemo } from "react"
 import Link from "next/link"
 import { usePathname } from "next/navigation"
+import { motion, AnimatePresence } from "framer-motion"
 import { cn } from "@/lib/utils"
 import {
   Building2,
@@ -16,7 +17,6 @@ import {
   Settings,
   Shield,
   ChevronDown,
-  ChevronRight,
   LayoutDashboard,
   ClipboardList,
   UserCheck,
@@ -269,10 +269,92 @@ interface SidebarLinkProps {
   hasAnyRole: (roleNames: string[]) => boolean
   isAdmin: boolean
   onNavigate?: () => void
+  isLastChild?: boolean
+  parentOpen?: boolean
+  index?: number
+  totalChildren?: number
 }
 
-// Sidebar Link Component
-function SidebarLink({ item, businessUnitId, depth = 0, hasPermission, hasRole, hasAnyRole, isAdmin, onNavigate }: SidebarLinkProps) {
+// Tree connector component
+function TreeConnector({ isLastChild, depth, hasChildren, isOpen }: { 
+  isLastChild?: boolean
+  depth: number
+  hasChildren?: boolean
+  isOpen?: boolean
+}) {
+  if (depth === 0) return null
+  
+  return (
+    <div className="absolute left-0 top-0 h-full flex items-center" style={{ width: `${depth * 16 + 8}px` }}>
+      {/* Vertical lines for each depth level */}
+      {Array.from({ length: depth }, (_, i) => (
+        <div
+          key={i}
+          className="absolute bg-border"
+          style={{
+            left: `${i * 16 + 8}px`,
+            width: '1px',
+            height: '100%',
+          }}
+        />
+      ))}
+      
+      {/* Horizontal connector */}
+      <div
+        className="absolute bg-border"
+        style={{
+          left: `${(depth - 1) * 16 + 8}px`,
+          top: '50%',
+          width: '8px',
+          height: '1px',
+          transform: 'translateY(-50%)',
+        }}
+      />
+      
+      {/* Corner piece */}
+      <div
+        className={cn(
+          "absolute bg-border",
+          isLastChild ? "h-1/2" : "h-full"
+        )}
+        style={{
+          left: `${(depth - 1) * 16 + 8}px`,
+          width: '1px',
+          top: 0,
+        }}
+      />
+      
+      {/* Expand/collapse indicator for parent items */}
+      {hasChildren && (
+        <motion.div
+          className="absolute bg-primary rounded-full"
+          style={{
+            left: `${(depth - 1) * 16 + 5}px`,
+            top: '50%',
+            width: '6px',
+            height: '6px',
+            transform: 'translateY(-50%)',
+          }}
+          animate={{ scale: isOpen ? 1.2 : 1 }}
+          transition={{ duration: 0.2 }}
+        />
+      )}
+    </div>
+  )
+}
+
+// Enhanced Sidebar Link Component with animations
+function SidebarLink({ 
+  item, 
+  businessUnitId, 
+  depth = 0, 
+  hasPermission, 
+  hasRole, 
+  hasAnyRole, 
+  isAdmin, 
+  onNavigate,
+  isLastChild = false,
+}: SidebarLinkProps) {
   const pathname = usePathname()
   
   // Check permissions at the top level to avoid conditional hook calls
@@ -331,71 +413,134 @@ function SidebarLink({ item, businessUnitId, depth = 0, hasPermission, hasRole, 
     })
 
     return (
-      <Collapsible open={open} onOpenChange={setOpen}>
-        <CollapsibleTrigger asChild>
-          <Button
-            variant="ghost"
-            className={cn(
-              "w-full justify-start h-9 px-3",
-              depth > 0 && "ml-4",
-              isAnyChildActive && "bg-accent text-accent-foreground font-medium"
-            )}
-          >
-            <item.icon size={16} className="mr-2 shrink-0" />
-            <span className="truncate">{item.title}</span>
-            <div className="ml-auto">
-              {open ? (
-                <ChevronDown size={14} className="shrink-0" />
-              ) : (
-                <ChevronRight size={14} className="shrink-0" />
+      <motion.div
+        className="relative"
+      >
+        {depth > 0 && (
+          <TreeConnector 
+            isLastChild={isLastChild} 
+            depth={depth} 
+            hasChildren={true}
+            isOpen={open}
+          />
+        )}
+        
+        <Collapsible open={open} onOpenChange={setOpen}>
+          <CollapsibleTrigger asChild>
+            <Button
+              variant="ghost"
+              className={cn(
+                "w-full justify-start h-9 px-3 relative",
+                depth > 0 && "ml-0",
+                isAnyChildActive && "bg-accent text-accent-foreground font-medium",
+                "hover:bg-accent/50 transition-colors duration-200"
               )}
-            </div>
-          </Button>
-        </CollapsibleTrigger>
-        <CollapsibleContent className="space-y-1">
-          {visibleChildren.map((child) => (
-            <SidebarLink
-              key={child.title}
-              item={child}
-              businessUnitId={businessUnitId}
-              depth={depth + 1}
-              hasPermission={hasPermission}
-              hasRole={hasRole}
-              hasAnyRole={hasAnyRole}
-              isAdmin={isAdmin}
-              onNavigate={onNavigate}
-            />
-          ))}
-        </CollapsibleContent>
-      </Collapsible>
+              style={{ paddingLeft: `${depth * 16 + 12}px` }}
+            >
+              <motion.div
+                className="flex items-center w-full"
+                whileHover={{ x: 2 }}
+                transition={{ duration: 0.1 }}
+              >
+                <item.icon size={16} className="mr-2 shrink-0" />
+                <span className="truncate">{item.title}</span>
+                <motion.div 
+                  className="ml-auto"
+                  animate={{ rotate: open ? 0 : -90 }}
+                  transition={{ duration: 0.2 }}
+                >
+                  <ChevronDown size={14} className="shrink-0" />
+                </motion.div>
+              </motion.div>
+            </Button>
+          </CollapsibleTrigger>
+          <AnimatePresence>
+            {open && (
+              <CollapsibleContent asChild forceMount>
+                <motion.div
+                  initial={{ opacity: 0, height: 0 }}
+                  animate={{ opacity: 1, height: "auto" }}
+                  exit={{ opacity: 0, height: 0 }}
+                  transition={{ duration: 0.2, ease: "easeInOut" }}
+                  className="space-y-1 overflow-hidden"
+                >
+                  {visibleChildren.map((child, childIndex) => (
+                    <SidebarLink
+                      key={child.title}
+                      item={child}
+                      businessUnitId={businessUnitId}
+                      depth={depth + 1}
+                      hasPermission={hasPermission}
+                      hasRole={hasRole}
+                      hasAnyRole={hasAnyRole}
+                      isAdmin={isAdmin}
+                      onNavigate={onNavigate}
+                      isLastChild={childIndex === visibleChildren.length - 1}
+                      index={childIndex}
+                      totalChildren={visibleChildren.length}
+                    />
+                  ))}
+                </motion.div>
+              </CollapsibleContent>
+            )}
+          </AnimatePresence>
+        </Collapsible>
+      </motion.div>
     )
   }
 
   return (
-    <Button
-      asChild
-      variant={isActive ? "secondary" : "ghost"}
-      className={cn(
-        "w-full justify-start h-9 px-3",
-        depth > 0 && "ml-4",
-        isActive && "bg-accent text-accent-foreground font-medium"
-      )}
-      onClick={handleLinkClick}
+    <motion.div
+      className="relative"
     >
-      <Link href={href}>
-        <item.icon size={16} className="mr-2 shrink-0" />
-        <span className="truncate">{item.title}</span>
-        {item.badge && (
-          <Badge variant="secondary" className="ml-auto text-xs">
-            {item.badge}
-          </Badge>
+      {depth > 0 && (
+        <TreeConnector 
+          isLastChild={isLastChild} 
+          depth={depth} 
+          hasChildren={false}
+        />
+      )}
+      
+      <Button
+        asChild
+        variant={isActive ? "secondary" : "ghost"}
+        className={cn(
+          "w-full justify-start h-9 px-3 relative",
+          depth > 0 && "ml-0",
+          isActive && "bg-accent text-accent-foreground font-medium",
+          "hover:bg-accent/50 transition-all duration-200"
         )}
-      </Link>
-    </Button>
+        style={{ paddingLeft: `${depth * 16 + 12}px` }}
+        onClick={handleLinkClick}
+      >
+        <Link href={href} className="flex items-center w-full">
+          <motion.div
+            className="flex items-center w-full"
+            whileHover={{ x: 2 }}
+            whileTap={{ scale: 0.98 }}
+            transition={{ duration: 0.1 }}
+          >
+            <item.icon size={16} className="mr-2 shrink-0" />
+            <span className="truncate">{item.title}</span>
+            {item.badge && (
+              <motion.div
+                initial={{ scale: 0 }}
+                animate={{ scale: 1 }}
+                className="ml-auto"
+              >
+                <Badge variant="secondary" className="text-xs">
+                  {item.badge}
+                </Badge>
+              </motion.div>
+            )}
+          </motion.div>
+        </Link>
+      </Button>
+    </motion.div>
   )
 }
 
-// Navigation Section Component
+// Navigation Section Component with staggered animations
 function NavigationSection({ 
   title, 
   items, 
@@ -429,14 +574,16 @@ function NavigationSection({
   if (visibleItems.length === 0) return null
 
   return (
-    <div className="space-y-1">
+    <motion.div
+      className="space-y-1"
+    >
       <div className="px-3 py-2">
         <h3 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
           {title}
         </h3>
       </div>
       <div className="space-y-1">
-        {visibleItems.map((item) => (
+        {visibleItems.map((item, index) => (
           <SidebarLink
             key={item.title}
             item={item}
@@ -446,14 +593,16 @@ function NavigationSection({
             hasAnyRole={hasAnyRole}
             isAdmin={isAdmin}
             onNavigate={onNavigate}
+            index={index}
+            totalChildren={visibleItems.length}
           />
         ))}
       </div>
-    </div>
+    </motion.div>
   )
 }
 
-// Mobile Sidebar Component (separate from desktop)
+// Mobile Sidebar Component
 // eslint-disable-next-line @typescript-eslint/no-unused-vars
 export function MobileSidebar({ businessUnitId, businessUnits, currentUser }: SidebarProps) {
   const [open, setOpen] = useState(false)
@@ -490,7 +639,9 @@ export function MobileSidebar({ businessUnitId, businessUnits, currentUser }: Si
         </SheetHeader>
         <div className="flex flex-col h-full bg-background">
           {/* Header - Business Unit Switcher */}
-          <div className="p-4">
+          <div
+            className="p-4"
+          >
             <BusinessUnitSwitcher items={businessUnits} />
           </div>
           
@@ -547,16 +698,21 @@ export function MobileSidebar({ businessUnitId, businessUnits, currentUser }: Si
           </ScrollArea>
 
           {/* Footer */}
-          <div className="p-4 border-t">
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            transition={{ delay: 0.2 }}
+            className="p-4 border-t"
+          >
             <UserProfileLogout />
-          </div>
+          </motion.div>
         </div>
       </SheetContent>
     </Sheet>
   )
 }
 
-// Desktop Sidebar Component (your original design preserved)
+// Desktop Sidebar Component
 export function Sidebar({ businessUnitId, businessUnits, currentUser }: SidebarProps) {
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const { isAdmin, userRole, hasPermission, hasRole, hasAnyRole } = usePermissions()
@@ -571,10 +727,14 @@ export function Sidebar({ businessUnitId, businessUnits, currentUser }: SidebarP
 
   return (
     <>
-      {/* Desktop Sidebar - exactly as your original */}
-      <div className="hidden lg:flex flex-col h-full w-64 bg-background border-r">
+      {/* Desktop Sidebar */}
+      <div
+        className="hidden lg:flex flex-col h-full w-64 bg-background border-r"
+      >
         {/* Header - Business Unit Switcher */}
-        <div className="p-4">
+        <div
+          className="p-4"
+        >
           <BusinessUnitSwitcher items={businessUnits} />
         </div>
         
@@ -628,9 +788,14 @@ export function Sidebar({ businessUnitId, businessUnits, currentUser }: SidebarP
         </ScrollArea>
 
         {/* Footer */}
-        <div className="p-4 border-t">
+        <motion.div
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          transition={{ delay: 0.3 }}
+          className="p-4 border-t"
+        >
           <UserProfileLogout />
-        </div>
+        </motion.div>
       </div>
 
       {/* Mobile Sidebar */}
