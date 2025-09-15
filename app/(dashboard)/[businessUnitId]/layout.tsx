@@ -3,12 +3,18 @@ import { redirect } from "next/navigation";
 import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
 import { BusinessUnitProvider } from "@/context/business-unit-context";
+import type { UserAssignment } from "@/next-auth";
 import { Sidebar } from "@/components/new-sidebar";
 
+interface BusinessUnitItem {
+  id: string;
+  name: string;
+  description: string | null;
+}
 
 interface BusinessUnitLayoutProps {
   children: React.ReactNode;
-  params: { businessUnitId: string };
+  params: Promise<{ businessUnitId: string }>;
 }
 
 async function getBusinessUnitData(businessUnitId: string, userId: string) {
@@ -90,7 +96,7 @@ async function getBusinessUnitData(businessUnitId: string, userId: string) {
   }
 
   // Transform the assignments to match the expected type
-  const userAssignments = userData.businessUnitMembers.map(member => ({
+  const userAssignments: UserAssignment[] = userData.businessUnitMembers.map(member => ({
     businessUnitId: member.businessUnitId,
     roleId: member.roleId,
     businessUnit: {
@@ -130,7 +136,7 @@ export default async function BusinessUnitLayout({
     redirect("/auth/sign-in");
   }
 
-  // Await the params Promise to get the actual businessUnitId
+  // Extract businessUnitId from params directly
   const { businessUnitId } = await params;
   
   // Validate businessUnitId

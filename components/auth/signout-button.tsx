@@ -3,7 +3,7 @@
 import { useFormStatus } from "react-dom";
 import { Button } from "@/components/ui/button";
 import { LogOut } from "lucide-react";
-import { signOutAction } from "@/lib/actions/auth-actions";
+import { signOutAction } from "@/lib/auth-actions/auth-actions";
 
 // A small component to manage the submit button's state,
 // showing a loading indicator when the form is being processed.
