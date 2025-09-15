@@ -7,7 +7,7 @@ import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { toast } from 'sonner';
-import { PropertyClassification, PropertyStatus } from '@prisma/client';
+import { PropertyClassification, PropertyLocation, PropertyStatus } from '@prisma/client';
 
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -42,10 +42,12 @@ import {
   MapPin,
   Hash,
   Ruler,
-  Tag
+  Tag,
+  Archive
 } from 'lucide-react';
 
 const propertyFormSchema = z.object({
+  propertyName: z.string().min(1, 'Property name is required'),
   titleNumber: z.string().min(1, 'Title number is required'),
   lotNumber: z.string().min(1, 'Lot number is required'),
   location: z.string().min(1, 'Location is required'),
@@ -56,9 +58,10 @@ const propertyFormSchema = z.object({
   borrowerMortgagor: z.string().optional(),
   bank: z.string().optional(),
   custodyOriginalTitle: z.string().optional(),
-  propertyClassification: z.enum(PropertyClassification),
+  propertyClassification: z.nativeEnum(PropertyClassification),
   status: z.nativeEnum(PropertyStatus),
   remarks: z.string().optional(),
+  currentLocation: z.nativeEnum(PropertyLocation)
 });
 
 type PropertyFormData = z.infer<typeof propertyFormSchema>;
@@ -75,6 +78,7 @@ export function PropertyCreateForm({ businessUnitId }: PropertyCreateFormProps) 
   const form = useForm<PropertyFormData>({
     resolver: zodResolver(propertyFormSchema),
     defaultValues: {
+      propertyName: '',
       titleNumber: '',
       lotNumber: '',
       location: '',
@@ -88,6 +92,7 @@ export function PropertyCreateForm({ businessUnitId }: PropertyCreateFormProps) 
       propertyClassification: PropertyClassification.RESIDENTIAL,
       status: PropertyStatus.ACTIVE,
       remarks: '',
+      currentLocation: PropertyLocation.MAIN_OFFICE
     },
   });
 
@@ -123,228 +128,319 @@ export function PropertyCreateForm({ businessUnitId }: PropertyCreateFormProps) 
 
   return (
     <div className="space-y-6">
-      
       <Form {...form}>
         <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
-          {/* Property Details - Two Column Layout */}
+          {/* Basic Property Information */}
           <Card>
             <CardHeader>
               <CardTitle className="text-lg flex items-center gap-2">
                 <Building2 className="h-5 w-5 text-blue-600" />
-                Property Details
+                Basic Property Information
               </CardTitle>
             </CardHeader>
             <CardContent>
-              <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-                {/* Left Column */}
-                <div className="space-y-6">
-                  <FormField
-                    control={form.control}
-                    name="titleNumber"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel className="flex items-center gap-2">
-                          <Hash className="h-4 w-4" />
-                          Title Number *
-                        </FormLabel>
-                        <FormControl>
-                          <Input 
-                            placeholder="Enter title number" 
-                            disabled={isLoading}
-                            className="h-11"
-                            {...field} 
-                          />
-                        </FormControl>
-                        <FormDescription>
-                          Unique identifier for the property title
-                        </FormDescription>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-
-                  <FormField
-                    control={form.control}
-                    name="lotNumber"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel className="flex items-center gap-2">
-                          <Hash className="h-4 w-4" />
-                          Lot Number *
-                        </FormLabel>
-                        <FormControl>
-                          <Input 
-                            placeholder="Enter lot number" 
-                            disabled={isLoading}
-                            className="h-11"
-                            {...field} 
-                          />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-
-                  <FormField
-                    control={form.control}
-                    name="area"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel className="flex items-center gap-2">
-                          <Ruler className="h-4 w-4" />
-                          Area (sqm) *
-                        </FormLabel>
-                        <FormControl>
-                          <Input 
-                            type="number" 
-                            step="0.01"
-                            placeholder="Enter area in square meters" 
-                            disabled={isLoading}
-                            className="h-11"
-                            {...field} 
-                          />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-
-                  <FormField
-                    control={form.control}
-                    name="propertyClassification"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel className="flex items-center gap-2">
-                          <Tag className="h-4 w-4" />
-                          Property Classification *
-                        </FormLabel>
-                        <Select 
-                          onValueChange={field.onChange} 
-                          defaultValue={field.value}
-                          disabled={isLoading}
-                        >
+              <div className="grid grid-cols-1 xl:grid-cols-4 gap-6">
+                {/* Left side - Basic fields */}
+                <div className="xl:col-span-3 space-y-6">
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                    <FormField
+                      control={form.control}
+                      name="propertyName"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel className="flex items-center gap-2">
+                            <Building2 className="h-4 w-4" />
+                            Property Name *
+                          </FormLabel>
                           <FormControl>
-                            <SelectTrigger className="h-11">
-                              <SelectValue placeholder="Select classification" />
-                            </SelectTrigger>
+                            <Input 
+                              placeholder="Enter property name" 
+                              disabled={isLoading}
+                              className="h-11"
+                              {...field} 
+                            />
                           </FormControl>
-                          <SelectContent>
-                            <SelectItem value={PropertyClassification.RESIDENTIAL}>Residential</SelectItem>
-                            <SelectItem value={PropertyClassification.COMMERCIAL}>Commercial</SelectItem>
-                            <SelectItem value={PropertyClassification.INDUSTRIAL}>Industrial</SelectItem>
-                            <SelectItem value={PropertyClassification.AGRICULTURAL}>Agricultural</SelectItem>
-                            <SelectItem value={PropertyClassification.INSTITUTIONAL}>Institutional</SelectItem>
-                            <SelectItem value={PropertyClassification.MIXED_USE}>Mixed Use</SelectItem>
-                            <SelectItem value={PropertyClassification.VACANT_LOT}>Vacant Lot</SelectItem>
-                            <SelectItem value={PropertyClassification.OTHER}>Other</SelectItem>
-                          </SelectContent>
-                        </Select>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
+                          <FormDescription>
+                            Descriptive name for the property
+                          </FormDescription>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+
+                    <FormField
+                      control={form.control}
+                      name="titleNumber"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel className="flex items-center gap-2">
+                            <Hash className="h-4 w-4" />
+                            Title Number *
+                          </FormLabel>
+                          <FormControl>
+                            <Input 
+                              placeholder="Enter title number" 
+                              disabled={isLoading}
+                              className="h-11"
+                              {...field} 
+                            />
+                          </FormControl>
+                          <FormDescription>
+                            Official property title number
+                          </FormDescription>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+
+                    <FormField
+                      control={form.control}
+                      name="lotNumber"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel className="flex items-center gap-2">
+                            <Hash className="h-4 w-4" />
+                            Lot Number *
+                          </FormLabel>
+                          <FormControl>
+                            <Input 
+                              placeholder="Enter lot number" 
+                              disabled={isLoading}
+                              className="h-11"
+                              {...field} 
+                            />
+                          </FormControl>
+                          <FormDescription>
+                            Surveyed lot identification
+                          </FormDescription>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                  </div>
+
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <FormField
+                      control={form.control}
+                      name="location"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel className="flex items-center gap-2">
+                            <MapPin className="h-4 w-4" />
+                            Location *
+                          </FormLabel>
+                          <FormControl>
+                            <Input 
+                              placeholder="Enter complete address/location" 
+                              disabled={isLoading}
+                              className="h-11"
+                              {...field} 
+                            />
+                          </FormControl>
+                          <FormDescription>
+                            Complete property address
+                          </FormDescription>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+
+                    <FormField
+                      control={form.control}
+                      name="area"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel className="flex items-center gap-2">
+                            <Ruler className="h-4 w-4" />
+                            Area (sqm) *
+                          </FormLabel>
+                          <FormControl>
+                            <Input 
+                              type="number" 
+                              step="0.01"
+                              placeholder="Enter area in square meters" 
+                              disabled={isLoading}
+                              className="h-11"
+                              {...field}
+                              onChange={(e) => field.onChange(parseFloat(e.target.value) || 0)}
+                            />
+                          </FormControl>
+                          <FormDescription>
+                            Total property area in square meters
+                          </FormDescription>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                  </div>
+
+                  <div>
+                    <FormField
+                      control={form.control}
+                      name="description"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel className="flex items-center gap-2">
+                            <FileText className="h-4 w-4" />
+                            Property Description
+                          </FormLabel>
+                          <FormControl>
+                            <Textarea 
+                              placeholder="Enter detailed property description..." 
+                              disabled={isLoading}
+                              rows={4}
+                              {...field} 
+                            />
+                          </FormControl>
+                          <FormDescription>
+                            Optional detailed description of the property
+                          </FormDescription>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                  </div>
                 </div>
 
-                {/* Right Column */}
-                <div className="space-y-6">
-                  <FormField
-                    control={form.control}
-                    name="location"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel className="flex items-center gap-2">
-                          <MapPin className="h-4 w-4" />
-                          Location *
-                        </FormLabel>
-                        <FormControl>
-                          <Input 
-                            placeholder="Enter complete address/location" 
-                            disabled={isLoading}
-                            className="h-11"
-                            {...field} 
-                          />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
+                {/* Right side - Status, Classification, Location */}
+                <div className="xl:col-span-1">
+                  <Card className="h-fit">
+    <CardHeader>
+      <CardTitle className="text-lg flex items-center gap-2">
+        <Tag className="h-5 w-5 text-indigo-600" />
+        Status & Classification
+      </CardTitle>
+    </CardHeader>
+    <CardContent className="space-y-6">
+      <FormField
+        control={form.control}
+        name="status"
+        render={({ field }) => (
+          <FormItem>
+            <FormLabel className="flex items-center gap-2">
+              <Tag className="h-4 w-4" />
+              Status *
+            </FormLabel>
+            <Select 
+              onValueChange={field.onChange} 
+              defaultValue={field.value}
+              disabled={isLoading}
+            >
+              <FormControl>
+                <SelectTrigger className="h-11 w-full">
+                  <SelectValue placeholder="Select status" />
+                </SelectTrigger>
+              </FormControl>
+              <SelectContent>
+                <SelectItem value={PropertyStatus.ACTIVE}>
+                  <div className="flex items-center gap-2">
+                    <div className="h-2 w-2 bg-green-500 rounded-full" />
+                    Active
+                  </div>
+                </SelectItem>
+                <SelectItem value={PropertyStatus.PENDING}>
+                  <div className="flex items-center gap-2">
+                    <div className="h-2 w-2 bg-yellow-500 rounded-full" />
+                    Pending
+                  </div>
+                </SelectItem>
+                <SelectItem value={PropertyStatus.UNDER_REVIEW}>
+                  <div className="flex items-center gap-2">
+                    <div className="h-2 w-2 bg-blue-500 rounded-full" />
+                    Under Review
+                  </div>
+                </SelectItem>
+                <SelectItem value={PropertyStatus.INACTIVE}>
+                  <div className="flex items-center gap-2">
+                    <div className="h-2 w-2 bg-gray-500 rounded-full" />
+                    Inactive
+                  </div>
+                </SelectItem>
+              </SelectContent>
+            </Select>
+            <FormMessage />
+          </FormItem>
+        )}
+      />
 
-                  <FormField
-                    control={form.control}
-                    name="status"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel className="flex items-center gap-2 mt-8">
-                          <Tag className="h-4 w-4" />
-                          Status *
-                        </FormLabel>
-                        <Select 
-                          onValueChange={field.onChange} 
-                          defaultValue={field.value}
-                          disabled={isLoading}
-                        >
-                          <FormControl>
-                            <SelectTrigger className="h-11">
-                              <SelectValue placeholder="Select status" />
-                            </SelectTrigger>
-                          </FormControl>
-                          <SelectContent>
-                            <SelectItem value={PropertyStatus.ACTIVE}>
-                              <div className="flex items-center gap-2">
-                                <div className="h-2 w-2 bg-green-500 rounded-full" />
-                                Active
-                              </div>
-                            </SelectItem>
-                            <SelectItem value={PropertyStatus.PENDING}>
-                              <div className="flex items-center gap-2">
-                                <div className="h-2 w-2 bg-yellow-500 rounded-full" />
-                                Pending
-                              </div>
-                            </SelectItem>
-                            <SelectItem value={PropertyStatus.UNDER_REVIEW}>
-                              <div className="flex items-center gap-2">
-                                <div className="h-2 w-2 bg-blue-500 rounded-full" />
-                                Under Review
-                              </div>
-                            </SelectItem>
-                            <SelectItem value={PropertyStatus.INACTIVE}>
-                              <div className="flex items-center gap-2">
-                                <div className="h-2 w-2 bg-gray-500 rounded-full" />
-                                Inactive
-                              </div>
-                            </SelectItem>
-                          </SelectContent>
-                        </Select>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
+      <FormField
+        control={form.control}
+        name="propertyClassification"
+        render={({ field }) => (
+          <FormItem>
+            <FormLabel className="flex items-center gap-2">
+              <Tag className="h-4 w-4" />
+              Classification *
+            </FormLabel>
+            <Select 
+              onValueChange={field.onChange} 
+              defaultValue={field.value}
+              disabled={isLoading}
+            >
+              <FormControl>
+                <SelectTrigger className="h-11 w-full">
+                  <SelectValue placeholder="Select classification" />
+                </SelectTrigger>
+              </FormControl>
+              <SelectContent>
+                <SelectItem value={PropertyClassification.RESIDENTIAL}>Residential</SelectItem>
+                <SelectItem value={PropertyClassification.COMMERCIAL}>Commercial</SelectItem>
+                <SelectItem value={PropertyClassification.INDUSTRIAL}>Industrial</SelectItem>
+                <SelectItem value={PropertyClassification.AGRICULTURAL}>Agricultural</SelectItem>
+                <SelectItem value={PropertyClassification.INSTITUTIONAL}>Institutional</SelectItem>
+                <SelectItem value={PropertyClassification.MIXED_USE}>Mixed Use</SelectItem>
+                <SelectItem value={PropertyClassification.VACANT_LOT}>Vacant Lot</SelectItem>
+                <SelectItem value={PropertyClassification.OTHER}>Other</SelectItem>
+              </SelectContent>
+            </Select>
+            <FormMessage />
+          </FormItem>
+        )}
+      />
 
-                  <FormField
-                    control={form.control}
-                    name="description"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Property Description</FormLabel>
-                        <FormControl>
-                          <Textarea 
-                            placeholder="Enter property description" 
-                            disabled={isLoading}
-                            rows={4}
-                            {...field} 
-                          />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
+      <FormField
+        control={form.control}
+        name="currentLocation"
+        render={({ field }) => (
+          <FormItem>
+            <FormLabel className="flex items-center gap-2">
+              <Archive className="h-4 w-4" />
+              Location *
+            </FormLabel>
+            <Select 
+              onValueChange={field.onChange} 
+              defaultValue={field.value}
+              disabled={isLoading}
+            >
+              <FormControl>
+                <SelectTrigger className="h-11 w-full">
+                  <SelectValue placeholder="Select current location" />
+                </SelectTrigger>
+              </FormControl>
+              <SelectContent>
+                <SelectItem value={PropertyLocation.MAIN_OFFICE}>Main Office</SelectItem>
+                <SelectItem value={PropertyLocation.SUBSIDIARY_COMPANY}>Branch Office</SelectItem>
+                <SelectItem value={PropertyLocation.BANK_CUSTODY}>Bank Custody</SelectItem>
+                <SelectItem value={PropertyLocation.EXTERNAL_HOLDER}>External</SelectItem>
+                <SelectItem value={PropertyLocation.IN_TRANSIT}>In-transit</SelectItem>
+              </SelectContent>
+            </Select>
+            <FormDescription>
+              Where the property documents are currently stored
+            </FormDescription>
+            <FormMessage />
+          </FormItem>
+        )}
+      />
+    </CardContent>
+  </Card>
                 </div>
               </div>
             </CardContent>
           </Card>
 
           {/* Ownership & Financial Information */}
-          <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
             {/* Ownership Information */}
             <Card>
               <CardHeader>
@@ -359,7 +455,10 @@ export function PropertyCreateForm({ businessUnitId }: PropertyCreateFormProps) 
                   name="registeredOwner"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>Registered Owner <span className="text-red-500">*</span></FormLabel>
+                      <FormLabel className="flex items-center gap-2">
+                        <User className="h-4 w-4" />
+                        Registered Owner *
+                      </FormLabel>
                       <FormControl>
                         <Input 
                           placeholder="Enter registered owner name" 
@@ -368,6 +467,9 @@ export function PropertyCreateForm({ businessUnitId }: PropertyCreateFormProps) 
                           {...field} 
                         />
                       </FormControl>
+                      <FormDescription>
+                        Legal owner as per property title
+                      </FormDescription>
                       <FormMessage />
                     </FormItem>
                   )}
@@ -378,15 +480,21 @@ export function PropertyCreateForm({ businessUnitId }: PropertyCreateFormProps) 
                   name="custodyOriginalTitle"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>Custody of Original Title</FormLabel>
+                      <FormLabel className="flex items-center gap-2">
+                        <Archive className="h-4 w-4" />
+                        Custody of Original Title
+                      </FormLabel>
                       <FormControl>
                         <Input 
-                          placeholder="Enter who has custody of original title" 
+                          placeholder="Who has custody of original title" 
                           disabled={isLoading}
                           className="h-11"
                           {...field} 
                         />
                       </FormControl>
+                      <FormDescription>
+                        Person/entity holding the original title
+                      </FormDescription>
                       <FormMessage />
                     </FormItem>
                   )}
@@ -408,7 +516,10 @@ export function PropertyCreateForm({ businessUnitId }: PropertyCreateFormProps) 
                   name="borrowerMortgagor"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>Borrower/Mortgagor</FormLabel>
+                      <FormLabel className="flex items-center gap-2">
+                        <User className="h-4 w-4" />
+                        Borrower/Mortgagor
+                      </FormLabel>
                       <FormControl>
                         <Input 
                           placeholder="Enter borrower/mortgagor name" 
@@ -417,6 +528,9 @@ export function PropertyCreateForm({ businessUnitId }: PropertyCreateFormProps) 
                           {...field} 
                         />
                       </FormControl>
+                      <FormDescription>
+                        Person who borrowed against the property
+                      </FormDescription>
                       <FormMessage />
                     </FormItem>
                   )}
@@ -427,24 +541,29 @@ export function PropertyCreateForm({ businessUnitId }: PropertyCreateFormProps) 
                   name="bank"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>Bank</FormLabel>
+                      <FormLabel className="flex items-center gap-2">
+                        <CreditCard className="h-4 w-4" />
+                        Bank/Financial Institution
+                      </FormLabel>
                       <FormControl>
                         <Input 
-                          placeholder="Enter bank name" 
+                          placeholder="Enter bank or financial institution" 
                           disabled={isLoading}
                           className="h-11"
                           {...field} 
                         />
                       </FormControl>
+                      <FormDescription>
+                        Lending institution if applicable
+                      </FormDescription>
                       <FormMessage />
                     </FormItem>
                   )}
                 />
               </CardContent>
             </Card>
-          </div>
 
-          {/* Additional Details - Full Width */}
+             {/* Additional Details */}
           <Card>
             <CardHeader>
               <CardTitle className="text-lg flex items-center gap-2">
@@ -458,15 +577,21 @@ export function PropertyCreateForm({ businessUnitId }: PropertyCreateFormProps) 
                 name="encumbranceMortgage"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Encumbrance/Mortgage</FormLabel>
+                    <FormLabel className="flex items-center gap-2">
+                      <CreditCard className="h-4 w-4" />
+                      Encumbrance/Mortgage Details
+                    </FormLabel>
                     <FormControl>
                       <Textarea 
-                        placeholder="Enter encumbrance or mortgage details" 
+                        placeholder="Enter details about any encumbrances, mortgages, or liens on the property..." 
                         disabled={isLoading}
                         rows={3}
                         {...field} 
                       />
                     </FormControl>
+                    <FormDescription>
+                      Information about loans, liens, or other encumbrances
+                    </FormDescription>
                     <FormMessage />
                   </FormItem>
                 )}
@@ -477,49 +602,63 @@ export function PropertyCreateForm({ businessUnitId }: PropertyCreateFormProps) 
                 name="remarks"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Remarks</FormLabel>
+                    <FormLabel className="flex items-center gap-2">
+                      <FileText className="h-4 w-4" />
+                      Additional Remarks
+                    </FormLabel>
                     <FormControl>
                       <Textarea 
-                        placeholder="Enter any additional remarks or notes" 
+                        placeholder="Enter any additional notes, special conditions, or important information..." 
                         disabled={isLoading}
                         rows={4}
                         {...field} 
                       />
                     </FormControl>
+                    <FormDescription>
+                      Any other relevant information or notes
+                    </FormDescription>
                     <FormMessage />
                   </FormItem>
                 )}
               />
             </CardContent>
           </Card>
+          </div>
+
+         
 
           <Separator />
 
           {/* Form Actions */}
-          <div className="flex items-center justify-end space-x-4 pt-4">
-            <Button
-              type="button"
-              variant="outline"
-              onClick={handleCancel}
-              disabled={isLoading}
-              size="lg"
-            >
-              <X className="h-4 w-4 mr-2" />
-              Cancel
-            </Button>
-            <Button type="submit" disabled={isLoading} size="lg">
-              {isLoading ? (
-                <>
-                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                  Creating...
-                </>
-              ) : (
-                <>
-                  <Save className="h-4 w-4 mr-2" />
-                  Create Property
-                </>
-              )}
-            </Button>
+          <div className="flex items-center justify-between pt-4">
+            <div className="text-sm text-muted-foreground">
+              Fields marked with * are required
+            </div>
+            <div className="flex items-center space-x-4">
+              <Button
+                type="button"
+                variant="outline"
+                onClick={handleCancel}
+                disabled={isLoading}
+                size="lg"
+              >
+                <X className="h-4 w-4 mr-2" />
+                Cancel
+              </Button>
+              <Button type="submit" disabled={isLoading} size="lg">
+                {isLoading ? (
+                  <>
+                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                    Creating Property...
+                  </>
+                ) : (
+                  <>
+                    <Save className="h-4 w-4 mr-2" />
+                    Create Property
+                  </>
+                )}
+              </Button>
+            </div>
           </div>
         </form>
       </Form>

@@ -1,166 +1,103 @@
 // context/business-unit-context.tsx
 'use client';
 
-import { createContext, useContext, useMemo } from 'react';
-import type { UserAssignment } from '@/next-auth';
+import React, { createContext, useContext, useMemo } from 'react';
+import type { UserAssignment, RolePermission } from '@/next-auth';
 
-interface BusinessUnitItem {
+interface BusinessUnit {
   id: string;
   name: string;
   description: string | null;
 }
 
-interface BusinessUnitContextType {
+interface BusinessUnitContextValue {
   businessUnitId: string;
-  businessUnit: BusinessUnitItem;
-  userRole: string | null;
-  userRoleId: string | null;
-  userPermissions: string[];
+  businessUnit: BusinessUnit;
   userAssignments: UserAssignment[];
-  // Permission helpers
-  canManageProperties: boolean;
-  canApproveProperties: boolean;
-  canManageUsers: boolean;
-  canManageRoles: boolean;
-  canViewReports: boolean;
-  canManageBusinessUnit: boolean;
-  canViewAuditLogs: boolean;
-  canManageSystem: boolean;
-  isAdmin: boolean;
-  isSuperAdmin: boolean;
-  // Utility functions
-  hasPermission: (permission: string) => boolean;
-  hasRole: (roleName: string) => boolean;
-  hasAnyRole: (roleNames: string[]) => boolean;
+  currentAssignment: UserAssignment | null;
+  
+  // Permission helpers for current business unit
+  hasPermission: (
+    module: string,
+    permission: keyof Pick<RolePermission, 'canCreate' | 'canRead' | 'canUpdate' | 'canDelete' | 'canApprove'>
+  ) => boolean;
+  
+  // Role helpers for current business unit
+  getRoleLevel: () => number;
+  getRoleName: () => string | null;
+  canApprove: (module?: string) => boolean;
+  
+  // Get all permissions for current business unit
+  getAllPermissions: () => RolePermission[];
 }
 
-const BusinessUnitContext = createContext<BusinessUnitContextType | null>(null);
-
-export function useBusinessUnit() {
-  const context = useContext(BusinessUnitContext);
-  if (!context) {
-    throw new Error('useBusinessUnit must be used within a BusinessUnitProvider');
-  }
-  return context;
-}
+const BusinessUnitContext = createContext<BusinessUnitContextValue | null>(null);
 
 interface BusinessUnitProviderProps {
   children: React.ReactNode;
   businessUnitId: string;
-  businessUnit: BusinessUnitItem;
+  businessUnit: BusinessUnit;
   userAssignments: UserAssignment[];
 }
 
-export function BusinessUnitProvider({ 
-  children, 
-  businessUnitId, 
-  businessUnit, 
-  userAssignments 
+export function BusinessUnitProvider({
+  children,
+  businessUnitId,
+  businessUnit,
+  userAssignments,
 }: BusinessUnitProviderProps) {
-  
   const contextValue = useMemo(() => {
-    // Find the current user's assignment for this business unit
+    // Find the current assignment for this business unit
     const currentAssignment = userAssignments.find(
       assignment => assignment.businessUnitId === businessUnitId
-    );
+    ) || null;
 
-    const userRole = currentAssignment?.role.name || null;
-    const userRoleId = currentAssignment?.role.id || null;
-    const userPermissions = currentAssignment?.role.permissions || [];
-
-    // Permission checking utilities
-    const hasPermission = (permission: string): boolean => {
-      return userPermissions.includes(permission);
+    const hasPermission = (
+      module: string,
+      permission: keyof Pick<RolePermission, 'canCreate' | 'canRead' | 'canUpdate' | 'canDelete' | 'canApprove'>
+    ): boolean => {
+      if (!currentAssignment) return false;
+      
+      return currentAssignment.role.permissions.some(perm =>
+        perm.module === module && perm[permission] === true
+      );
     };
 
-    const hasRole = (roleName: string): boolean => {
-      return userRole === roleName;
+    const getRoleLevel = (): number => {
+      return currentAssignment?.role.level || 0;
     };
 
-    const hasAnyRole = (roleNames: string[]): boolean => {
-      return userRole ? roleNames.includes(userRole) : false;
+    const getRoleName = (): string | null => {
+      return currentAssignment?.role.name || null;
     };
 
-    // Define admin roles based on your seed data
-    const adminRoles = ['System Administrator'];
-    const managerRoles = ['Property Manager', 'Property Supervisor', 'Finance Manager', 'Legal Officer'];
-    
-    const isAdmin = hasAnyRole(adminRoles);
-    const isSuperAdmin = hasRole('System Administrator');
+    const canApprove = (module?: string): boolean => {
+      if (!currentAssignment) return false;
+      
+      if (module) {
+        return currentAssignment.role.permissions.some(perm =>
+          perm.module === module && perm.canApprove === true
+        );
+      }
+      
+      // Check if user can approve in any module
+      return currentAssignment.role.permissions.some(perm => perm.canApprove === true);
+    };
 
-    // Define specific permission checks based on your seed permissions
-    const canManageProperties = 
-      isAdmin || 
-      hasPermission('properties:create') ||
-      hasPermission('properties:update') ||
-      hasPermission('properties:delete') ||
-      hasAnyRole(['Property Manager', 'Property Supervisor', 'Property Officer']);
-
-    const canApproveProperties = 
-      isAdmin || 
-      hasPermission('properties:approve') || 
-      hasAnyRole(['Property Supervisor', 'Property Manager']);
-
-    const canManageUsers = 
-      isAdmin || 
-      hasPermission('users:create') ||
-      hasPermission('users:update') ||
-      hasPermission('users:delete') ||
-      hasPermission('users:manage_roles');
-
-    const canManageRoles = 
-      isAdmin || 
-      hasPermission('roles:create') ||
-      hasPermission('roles:update') ||
-      hasPermission('roles:delete');
-
-    const canViewReports = 
-      isAdmin || 
-      hasPermission('reports:view_all') ||
-      hasPermission('reports:view_assigned') ||
-      hasPermission('reports:view_department') ||
-      hasPermission('reports:view_financial') ||
-      hasPermission('reports:view_legal') ||
-      hasAnyRole(managerRoles);
-
-    const canManageBusinessUnit = 
-      isAdmin || 
-      hasPermission('business_units:update') ||
-      hasPermission('business_units:manage_members');
-
-    const canViewAuditLogs = 
-      isAdmin ||
-      hasPermission('audit_logs:view') ||
-      hasPermission('audit_logs:view_department') ||
-      hasPermission('audit_logs:view_financial') ||
-      hasPermission('audit_logs:view_legal') ||
-      hasRole('Auditor');
-
-    const canManageSystem = 
-      isAdmin ||
-      hasPermission('system:manage') ||
-      hasPermission('system:settings:update');
+    const getAllPermissions = (): RolePermission[] => {
+      return currentAssignment?.role.permissions || [];
+    };
 
     return {
       businessUnitId,
       businessUnit,
-      userRole,
-      userRoleId,
-      userPermissions,
       userAssignments,
-      canManageProperties,
-      canApproveProperties,
-      canManageUsers,
-      canManageRoles,
-      canViewReports,
-      canManageBusinessUnit,
-      canViewAuditLogs,
-      canManageSystem,
-      isAdmin,
-      isSuperAdmin,
+      currentAssignment,
       hasPermission,
-      hasRole,
-      hasAnyRole,
+      getRoleLevel,
+      getRoleName,
+      canApprove,
+      getAllPermissions,
     };
   }, [businessUnitId, businessUnit, userAssignments]);
 
@@ -171,38 +108,48 @@ export function BusinessUnitProvider({
   );
 }
 
-// Additional hook for permission checking
-export function usePermissions() {
-  const context = useBusinessUnit();
+export function useBusinessUnit() {
+  const context = useContext(BusinessUnitContext);
   
-  return {
-    canManageProperties: context.canManageProperties,
-    canApproveProperties: context.canApproveProperties,
-    canManageUsers: context.canManageUsers,
-    canManageRoles: context.canManageRoles,
-    canViewReports: context.canViewReports,
-    canManageBusinessUnit: context.canManageBusinessUnit,
-    canViewAuditLogs: context.canViewAuditLogs,
-    canManageSystem: context.canManageSystem,
-    isAdmin: context.isAdmin,
-    isSuperAdmin: context.isSuperAdmin,
-    userRole: context.userRole,
-    userRoleId: context.userRoleId,
-    userPermissions: context.userPermissions,
-    hasPermission: context.hasPermission,
-    hasRole: context.hasRole,
-    hasAnyRole: context.hasAnyRole,
-  };
+  if (!context) {
+    throw new Error('useBusinessUnit must be used within a BusinessUnitProvider');
+  }
+  
+  return context;
 }
 
-// Hook for getting current business unit info
-export function useCurrentBusinessUnit() {
-  const context = useBusinessUnit();
-  
-  return {
-    businessUnitId: context.businessUnitId,
-    businessUnit: context.businessUnit,
-    userRole: context.userRole,
-    userRoleId: context.userRoleId,
-  };
+// Additional custom hooks for specific use cases
+export function useCurrentBusinessUnitPermissions() {
+  const { getAllPermissions } = useBusinessUnit();
+  return getAllPermissions();
+}
+
+export function useCurrentBusinessUnitRole() {
+  const { currentAssignment } = useBusinessUnit();
+  return currentAssignment?.role || null;
+}
+
+export function useCanCreateInCurrentBU(module: string) {
+  const { hasPermission } = useBusinessUnit();
+  return hasPermission(module, 'canCreate');
+}
+
+export function useCanReadInCurrentBU(module: string) {
+  const { hasPermission } = useBusinessUnit();
+  return hasPermission(module, 'canRead');
+}
+
+export function useCanUpdateInCurrentBU(module: string) {
+  const { hasPermission } = useBusinessUnit();
+  return hasPermission(module, 'canUpdate');
+}
+
+export function useCanDeleteInCurrentBU(module: string) {
+  const { hasPermission } = useBusinessUnit();
+  return hasPermission(module, 'canDelete');
+}
+
+export function useCanApproveInCurrentBU(module: string) {
+  const { hasPermission } = useBusinessUnit();
+  return hasPermission(module, 'canApprove');
 }

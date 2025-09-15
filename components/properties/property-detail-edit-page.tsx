@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-unused-vars */
 'use client';
 
 import React, { useState, useTransition } from 'react';
@@ -13,6 +14,10 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Badge } from '@/components/ui/badge';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Avatar, AvatarFallback } from '@/components/ui/avatar';
+import { Separator } from '@/components/ui/separator';
+import { Alert, AlertDescription } from '@/components/ui/alert';
 import {
   Select,
   SelectContent,
@@ -29,39 +34,87 @@ import {
   FormLabel,
   FormMessage,
 } from '@/components/ui/form';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'; // Added CardFooter
 import {
   Tabs,
   TabsContent,
   TabsList,
   TabsTrigger,
 } from '@/components/ui/tabs';
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from '@/components/ui/table';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
 import { updateProperty } from '@/lib/actions/property-actions';
 import {
   Loader2,
   X,
   Building2,
   FileText,
-  User,
-  CreditCard,
   MapPin,
   Hash,
-  Ruler,
-  Tag,
-  Eye,
-  Clock,
   CheckCircle,
-  Send,
-  ArrowLeftRight,
-  RotateCcw,
-  Download,
   DollarSign,
-  Edit2,
-  Check,
+  Edit3,
+  User,
+  Info,
+  Activity,
+  Archive,
+  Save,
+  Eye,
+  MoreVertical,
+  Download,
+  ExternalLink,
+  Calendar,
+  TrendingUp,
+  AlertTriangle,
+  Users,
+  Landmark,
+  Home,
+  Factory,
+  TreePine,
+  School,
+  Grid3X3,
+  Square,
+  HelpCircle,
+  Building,
+  Clock,
+  CheckSquare,
+  XCircle,
+  Pause,
+  RotateCcw,
+  AlertCircle,
+  Shield,
+  CreditCard,
 } from 'lucide-react';
 import type { PropertyDetails } from '@/types/property-types';
 
+type BankData = { 
+  id: string; 
+  name: string; 
+  branchName: string; 
+};
+
+type UserData = { 
+  id: string; 
+  name: string; 
+};
+
+type BankList = BankData[];
+type UserList = UserData[];
+
 const propertyFormSchema = z.object({
+  propertyName: z.string().optional(),
   titleNumber: z.string().min(1, 'Title number is required'),
   lotNumber: z.string().min(1, 'Lot number is required'),
   location: z.string().min(1, 'Location is required'),
@@ -70,8 +123,8 @@ const propertyFormSchema = z.object({
   registeredOwner: z.string().min(1, 'Registered owner is required'),
   encumbranceMortgage: z.string().optional(),
   borrowerMortgagor: z.string().optional(),
-  bank: z.string().optional(),
-  custodyOriginalTitle: z.string().optional(),
+  bankId: z.string().optional(),
+  custodianId: z.string().min(1, 'Custodian is required'),
   propertyClassification: z.nativeEnum(PropertyClassification),
   status: z.nativeEnum(PropertyStatus),
   remarks: z.string().optional(),
@@ -82,58 +135,151 @@ type PropertyFormData = z.infer<typeof propertyFormSchema>;
 interface PropertyDetailEditPageProps {
   businessUnitId: string;
   property: PropertyDetails;
+  availableBanks: BankList;
+  availableCustodians: UserList;
 }
 
-// Helper function to render status badge with refined styles
-function getStatusBadge(status: PropertyStatus) {
-  const variants: Record<PropertyStatus, { className: string }> = {
-    ACTIVE: { className: 'bg-green-100 text-green-800 border-green-200' },
-    INACTIVE: { className: 'bg-slate-100 text-slate-800 border-slate-200' },
-    PENDING: { className: 'bg-yellow-100 text-yellow-800 border-yellow-200' },
-    RELEASED: { className: 'bg-blue-100 text-blue-800 border-blue-200' },
-    RETURNED: { className: 'bg-purple-100 text-purple-800 border-purple-200' },
-    UNDER_REVIEW: { className: 'bg-orange-100 text-orange-800 border-orange-200' },
-    DISPUTED: { className: 'bg-red-100 text-red-800 border-red-200' },
-  };
+const statusConfig = {
+  [PropertyStatus.ACTIVE]: { 
+    color: 'bg-emerald-500', 
+    textColor: 'text-emerald-700',
+    bgColor: 'bg-emerald-50',
+    borderColor: 'border-emerald-200',
+    label: 'Active',
+    icon: CheckSquare,
+    description: 'Property is active and available'
+  },
+  [PropertyStatus.INACTIVE]: { 
+    color: 'bg-gray-500', 
+    textColor: 'text-gray-700',
+    bgColor: 'bg-gray-50',
+    borderColor: 'border-gray-200',
+    label: 'Inactive',
+    icon: Pause,
+    description: 'Property is currently inactive'
+  },
+  [PropertyStatus.PENDING]: { 
+    color: 'bg-amber-500', 
+    textColor: 'text-amber-700',
+    bgColor: 'bg-amber-50',
+    borderColor: 'border-amber-200',
+    label: 'Pending',
+    icon: Clock,
+    description: 'Pending approval or processing'
+  },
+  [PropertyStatus.RELEASED]: { 
+    color: 'bg-blue-500', 
+    textColor: 'text-blue-700',
+    bgColor: 'bg-blue-50',
+    borderColor: 'border-blue-200',
+    label: 'Released',
+    icon: ExternalLink,
+    description: 'Property has been released'
+  },
+  [PropertyStatus.RETURNED]: { 
+    color: 'bg-purple-500', 
+    textColor: 'text-purple-700',
+    bgColor: 'bg-purple-50',
+    borderColor: 'border-purple-200',
+    label: 'Returned',
+    icon: RotateCcw,
+    description: 'Property has been returned'
+  },
+  [PropertyStatus.UNDER_REVIEW]: { 
+    color: 'bg-orange-500', 
+    textColor: 'text-orange-700',
+    bgColor: 'bg-orange-50',
+    borderColor: 'border-orange-200',
+    label: 'Under Review',
+    icon: AlertCircle,
+    description: 'Property is under review'
+  },
+  [PropertyStatus.DISPUTED]: { 
+    color: 'bg-red-500', 
+    textColor: 'text-red-700',
+    bgColor: 'bg-red-50',
+    borderColor: 'border-red-200',
+    label: 'Disputed',
+    icon: XCircle,
+    description: 'Property ownership is disputed'
+  },
+  [PropertyStatus.BANK_CUSTODY]: { 
+    color: 'bg-indigo-500', 
+    textColor: 'text-indigo-700',
+    bgColor: 'bg-indigo-50',
+    borderColor: 'border-indigo-200',
+    label: 'Bank Custody',
+    icon: Shield,
+    description: 'Property is in bank custody'
+  },
+};
 
-  const config = variants[status] || variants.INACTIVE;
-  return (
-    <Badge variant="outline" className={`${config.className} font-medium tracking-wide`}>
-      {status.replace(/_/g, ' ')}
-    </Badge>
-  );
-}
+const classificationConfig = {
+  [PropertyClassification.RESIDENTIAL]: { 
+    label: 'Residential', 
+    color: 'blue',
+    icon: Home,
+    description: 'Residential property'
+  },
+  [PropertyClassification.COMMERCIAL]: { 
+    label: 'Commercial', 
+    color: 'green',
+    icon: Building,
+    description: 'Commercial property'
+  },
+  [PropertyClassification.INDUSTRIAL]: { 
+    label: 'Industrial', 
+    color: 'gray',
+    icon: Factory,
+    description: 'Industrial property'
+  },
+  [PropertyClassification.AGRICULTURAL]: { 
+    label: 'Agricultural', 
+    color: 'emerald',
+    icon: TreePine,
+    description: 'Agricultural land'
+  },
+  [PropertyClassification.INSTITUTIONAL]: { 
+    label: 'Institutional', 
+    color: 'purple',
+    icon: School,
+    description: 'Institutional property'
+  },
+  [PropertyClassification.MIXED_USE]: { 
+    label: 'Mixed Use', 
+    color: 'indigo',
+    icon: Grid3X3,
+    description: 'Mixed-use property'
+  },
+  [PropertyClassification.VACANT_LOT]: { 
+    label: 'Vacant Lot', 
+    color: 'yellow',
+    icon: Square,
+    description: 'Vacant lot'
+  },
+  [PropertyClassification.OTHER]: { 
+    label: 'Other', 
+    color: 'slate',
+    icon: HelpCircle,
+    description: 'Other property type'
+  },
+};
 
-// Helper function to render classification badge with refined styles
-function getClassificationBadge(classification: PropertyClassification) {
-  const colors: Record<PropertyClassification, string> = {
-    RESIDENTIAL: 'bg-blue-50 text-blue-700 border-blue-200',
-    COMMERCIAL: 'bg-green-50 text-green-700 border-green-200',
-    INDUSTRIAL: 'bg-gray-50 text-gray-700 border-gray-200',
-    AGRICULTURAL: 'bg-emerald-50 text-emerald-700 border-emerald-200',
-    INSTITUTIONAL: 'bg-purple-50 text-purple-700 border-purple-200',
-    MIXED_USE: 'bg-indigo-50 text-indigo-700 border-indigo-200',
-    VACANT_LOT: 'bg-yellow-50 text-yellow-700 border-yellow-200',
-    OTHER: 'bg-slate-50 text-slate-700 border-slate-200',
-  };
-
-  return (
-    <Badge variant="outline" className={`${colors[classification]} font-medium tracking-wide`}>
-      {classification.replace(/_/g, ' ')}
-    </Badge>
-  );
-}
-
-export function PropertyDetailEditPage({ businessUnitId, property }: PropertyDetailEditPageProps) {
+export function PropertyDetailEditPage({ 
+  businessUnitId, 
+  property,
+  availableBanks,
+  availableCustodians,
+}: PropertyDetailEditPageProps) {
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isEditing, setIsEditing] = useState(false);
-  const [activeTab, setActiveTab] = useState('overview');
 
   const form = useForm<PropertyFormData>({
     resolver: zodResolver(propertyFormSchema),
     defaultValues: {
+      propertyName: property.propertyName || '',
       titleNumber: property.titleNumber || '',
       lotNumber: property.lotNumber || '',
       location: property.location || '',
@@ -142,8 +288,8 @@ export function PropertyDetailEditPage({ businessUnitId, property }: PropertyDet
       registeredOwner: property.registeredOwner || '',
       encumbranceMortgage: property.encumbranceMortgage || '',
       borrowerMortgagor: property.borrowerMortgagor || '',
-      bank: property.bank || '',
-      custodyOriginalTitle: property.custodyOriginalTitle || '',
+      bankId: property.bankId || undefined,
+      custodianId: property.custodianId || '',
       propertyClassification: property.propertyClassification || PropertyClassification.RESIDENTIAL,
       status: property.status || PropertyStatus.ACTIVE,
       remarks: property.remarks || '',
@@ -152,10 +298,8 @@ export function PropertyDetailEditPage({ businessUnitId, property }: PropertyDet
 
   const onSubmit = async (data: PropertyFormData) => {
     setIsSubmitting(true);
-
     try {
       const result = await updateProperty(businessUnitId, property.id, data);
-
       if (result.success) {
         toast.success('Property updated successfully');
         setIsEditing(false);
@@ -178,74 +322,161 @@ export function PropertyDetailEditPage({ businessUnitId, property }: PropertyDet
     form.reset();
   };
 
-  const formatArea = (area: number) => {
+  const formatArea = (area: number): string => {
     return new Intl.NumberFormat('en-US', {
       minimumFractionDigits: 0,
       maximumFractionDigits: 2,
     }).format(area);
   };
 
-  const getUserName = (user: { firstName: string | null; lastName: string | null } | null) => {
+  const formatCurrency = (amount: string | number): string => {
+    return new Intl.NumberFormat('en-US', {
+      style: 'currency',
+      currency: 'PHP',
+    }).format(Number(amount));
+  };
+
+  const getUserName = (user: { firstName: string | null; lastName: string | null } | null): string => {
     if (!user) return 'Unknown User';
     return `${user.firstName || ''} ${user.lastName || ''}`.trim() || 'Unknown User';
   };
 
+  const getUserInitials = (user: { firstName: string | null; lastName: string | null } | null): string => {
+    if (!user) return 'UN';
+    const first = user.firstName?.charAt(0) || '';
+    const last = user.lastName?.charAt(0) || '';
+    return `${first}${last}`.toUpperCase() || 'UN';
+  };
+
+  const getDocumentIcon = (mimeType: string) => {
+    if (mimeType.includes('pdf')) return FileText;
+    if (mimeType.includes('image')) return Eye;
+    if (mimeType.includes('document') || mimeType.includes('word')) return FileText;
+    return FileText;
+  };
+
   const isLoading = isPending || isSubmitting;
+  const currentStatus = statusConfig[property.status];
+  const currentClassification = classificationConfig[property.propertyClassification];
+  const StatusIcon = currentStatus.icon;
+  const ClassificationIcon = currentClassification.icon;
 
-  return (
-    <div className="space-y-6 p-4 min-h-screen">
-      {/* Property Header */}
-      <div className="bg-white rounded-xl p-6 shadow-sm border border-slate-200/60">
+  const totalActivityCount = property._count.approvalRequests + 
+    property._count.releases + 
+    property._count.turnovers + 
+    property._count.returns;
+
+  // Enhanced Property Header
+  const PropertyHeader = () => (
+    <div className=" rounded-xl mb-8">
+      <div>
         <div className="flex items-start justify-between">
-          <div className="flex-1 space-y-4">
-
-            <div className="space-y-2">
-              <h2 className="text-3xl font-bold tracking-tight bg-gradient-to-r from-slate-900 to-slate-700 bg-clip-text text-transparent">
-                {property.titleNumber}
-              </h2>
-              <div className="flex items-center gap-3">
-                <Badge variant="outline" className="font-mono text-xs bg-slate-50 border-slate-300">
-                  Lot {property.lotNumber}
-                </Badge>
-                {getStatusBadge(property.status)}
-                {getClassificationBadge(property.propertyClassification)}
+          <div className="flex-1">
+            <div className="flex items-center gap-4 mb-4">
+              <div className={`p-3 rounded-xl ${currentStatus.bgColor} ${currentStatus.borderColor} border`}>
+                <StatusIcon className={`h-6 w-6 ${currentStatus.textColor}`} />
+              </div>
+              <div>
+                <h1 className="text-3xl font-bold text-gray-900 mb-1">
+                  {property.propertyName || `Property ${property.lotNumber}`}
+                </h1>
+                <div className="flex items-center gap-4">
+                  <Badge 
+                    className={`${currentStatus.bgColor} ${currentStatus.textColor} border-0 px-3 py-1`}
+                  >
+                    <StatusIcon className="h-3 w-3 mr-1" />
+                    {currentStatus.label}
+                  </Badge>
+                  <Badge variant="outline" className="px-3 py-1">
+                    <ClassificationIcon className="h-3 w-3 mr-1" />
+                    {currentClassification.label}
+                  </Badge>
+                </div>
               </div>
             </div>
-            <div className="flex items-center gap-3 pt-2">
-              <MapPin className="h-5 w-5 text-slate-600 flex-shrink-0" />
-              <p className="text-sm font-semibold text-slate-900 truncate">{property.location}</p>
+            
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-6 text-sm">
+        <div className="flex items-center gap-3 p-4 bg-gray-50 rounded-lg">
+                <Hash className="h-5 w-5 text-gray-400" />
+                <div>
+                  <p className="font-medium text-gray-900">Title Number</p>
+                  <p className="text-gray-600">{property.titleNumber}</p>
+                </div>
+              </div>
+              <div className="flex items-center gap-3 p-4 bg-gray-50 rounded-lg">
+                <Building2 className="h-5 w-5 text-gray-400" />
+                <div>
+                  <p className="font-medium text-gray-900">Lot Number</p>
+                  <p className="text-gray-600">{property.lotNumber}</p>
+                </div>
+              </div>
+              <div className="flex items-center gap-3 p-4 bg-gray-50 rounded-lg">
+                <MapPin className="h-5 w-5 text-gray-400" />
+                <div>
+                  <p className="font-medium text-gray-900">Location</p>
+                  <p className="text-gray-600">{property.location}</p>
+                </div>
+              </div>
             </div>
           </div>
-          <div className="flex space-x-3 ml-6">
+          
+          <div className="flex items-center gap-3 ml-6">
             {!isEditing ? (
-              <Button onClick={() => setIsEditing(true)}>
-                <Edit2 className="h-4 w-4 mr-2" />
-                Edit Property
-              </Button>
-            ) : (
-              <div className="flex items-center gap-2">
-                <Button
-                  onClick={handleCancel}
-                  variant="outline"
-                  disabled={isLoading}
-                  className="border-slate-300 hover:bg-slate-50"
+              <>
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <Button variant="outline" size="icon">
+                      <MoreVertical className="h-4 w-4" />
+                    </Button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="end">
+                    <DropdownMenuItem>
+                      <Download className="h-4 w-4 mr-2" />
+                      Download Report
+                    </DropdownMenuItem>
+                    <DropdownMenuItem>
+                      <ExternalLink className="h-4 w-4 mr-2" />
+                      View External
+                    </DropdownMenuItem>
+                    <DropdownMenuSeparator />
+                    <DropdownMenuItem>
+                      <Archive className="h-4 w-4 mr-2" />
+                      Archive Property
+                    </DropdownMenuItem>
+                  </DropdownMenuContent>
+                </DropdownMenu>
+                <Button 
+                  onClick={() => setIsEditing(true)}
+                  className="flex items-center gap-2 bg-blue-600 hover:bg-blue-700"
                 >
-                  <X className="h-4 w-4 mr-2" />
+                  <Edit3 className="h-4 w-4" />
+                  Edit Property
+                </Button>
+              </>
+            ) : (
+              <div className="flex items-center gap-3">
+                <Button
+                  variant="outline"
+                  onClick={handleCancel}
+                  disabled={isLoading}
+                  className="flex items-center gap-2"
+                >
+                  <X className="h-4 w-4" />
                   Cancel
                 </Button>
                 <Button
                   onClick={form.handleSubmit(onSubmit)}
                   disabled={isLoading}
-                  className="min-w-[120px] bg-blue-600 hover:bg-blue-700 text-white"
+                  className="flex items-center gap-2 bg-blue-600 hover:bg-blue-700"
                 >
                   {isLoading ? (
                     <>
-                      <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                      <Loader2 className="h-4 w-4 animate-spin" />
                       Saving...
                     </>
                   ) : (
                     <>
-                      <Check className="h-4 w-4 mr-2" />
+                      <Save className="h-4 w-4" />
                       Save Changes
                     </>
                   )}
@@ -255,69 +486,164 @@ export function PropertyDetailEditPage({ businessUnitId, property }: PropertyDet
           </div>
         </div>
       </div>
+    </div>
+  );
 
-      {/* Tabs */}
-      <Tabs value={activeTab} onValueChange={setActiveTab}>
-        <TabsList className="bg-white border border-slate-200 p-1 space-x-4 rounded-lg shadow-sm">
-          <TabsTrigger value="overview" className="data-[state=active]:bg-blue-600 data-[state=active]:text-white data-[state=active]:shadow-sm transition-all duration-200">Overview</TabsTrigger>
-          <TabsTrigger value="documents" className="data-[state=active]:bg-blue-600 data-[state=active]:text-white data-[state=active]:shadow-sm transition-all duration-200">
-            Documents
-            {property._count.documents > 0 && (
-              <Badge variant="secondary" className="ml-2 bg-slate-100 text-slate-600 text-xs">
-                {property._count.documents}
-              </Badge>
+  // Enhanced Info Card Component
+  const InfoCard = ({ 
+    title, 
+    description,
+    icon: Icon, 
+    children,
+    className = ""
+  }: { 
+    title: string;
+    description?: string;
+    icon: React.ComponentType<{ className?: string }>; 
+    children: React.ReactNode;
+    className?: string;
+  }) => (
+    <Card>
+      <CardHeader className="pb-4">
+        <div className="flex items-center gap-3">
+          <div className="p-2 bg-blue-50 rounded-lg">
+            <Icon className="h-5 w-5 text-blue-600" />
+          </div>
+          <div>
+            <CardTitle className="text-lg font-semibold text-gray-900">{title}</CardTitle>
+            {description && (
+              <CardDescription className="text-sm text-gray-500 mt-1">
+                {description}
+              </CardDescription>
             )}
-          </TabsTrigger>
-          <TabsTrigger value="workflow" className="data-[state=active]:bg-blue-600 data-[state=active]:text-white data-[state=active]:shadow-sm transition-all duration-200">
-            Workflow
-            {(property._count.approvals + property._count.releases + property._count.turnovers + property._count.returns) > 0 && (
-              <Badge variant="secondary" className="ml-2 bg-slate-100 text-slate-600 text-xs">
-                {property._count.approvals + property._count.releases + property._count.turnovers + property._count.returns}
-              </Badge>
-            )}
-          </TabsTrigger>
-          <TabsTrigger value="tax" className="data-[state=active]:bg-blue-600 data-[state=active]:text-white data-[state=active]:shadow-sm transition-all duration-200">
-            Tax Records
-            {property._count.rptRecords > 0 && (
-              <Badge variant="secondary" className="ml-2 bg-slate-100 text-slate-600 text-xs">
-                {property._count.rptRecords}
-              </Badge>
-            )}
-          </TabsTrigger>
-        </TabsList>
+          </div>
+        </div>
+      </CardHeader>
+      <CardContent>
+        {children}
+      </CardContent>
+    </Card>
+  );
 
-        <div className="mt-6">
-          <TabsContent value="overview" className="space-y-6">
-            {isEditing ? (
-              <Form {...form}>
-                <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
-                  <Card className="bg-white border-slate-200 shadow-sm">
-                    <CardHeader className="border-b border-slate-100 bg-gradient-to-r from-slate-50 to-white">
-                      <CardTitle className="text-lg flex items-center gap-3 text-slate-900">
-                        <Building2 className="h-5 w-5 text-blue-600" />
-                        Property Details
-                      </CardTitle>
-                    </CardHeader>
-                    <CardContent className="p-6">
-                      <div className="grid grid-cols-1 lg:grid-cols-2 gap-x-8 gap-y-6">
+  // Enhanced Field Row Component
+  const FieldRow = ({ 
+    label, 
+    value, 
+  }: { 
+    label: string; 
+    value: string | React.ReactNode;
+    icon?: React.ComponentType<{ className?: string }>;
+  }) => (
+    <div className="flex items-center justify-between py-3 border-b border-gray-100 last:border-0">
+      <div className="flex items-center gap-2">
+        <span className="text-sm font-medium text-gray-600">{label}</span>
+      </div>
+      <div className="text-sm text-gray-900 text-right flex-1 ml-4">
+        {value}
+      </div>
+    </div>
+  );
+
+  return (
+    <div className="max-w-full mx-auto min-h-screen">
+      <PropertyHeader />
+
+      <Tabs defaultValue="overview" className="space-y-2">
+        <div className="rounded-xl">
+          <TabsList className="w-full space-x-4">
+            <TabsTrigger 
+              value="overview" 
+              className="flex items-center gap-2 px-6 py-3 rounded-lg data-[state=active]:bg-blue-500 data-[state=active]:text-white data-[state=active]:shadow-sm transition-all"
+            >
+              <Eye className="h-4 w-4" />
+              Overview
+            </TabsTrigger>
+            <TabsTrigger 
+              value="documents" 
+              className="flex items-center gap-2 px-6 py-3 rounded-lg data-[state=active]:bg-blue-500 data-[state=active]:text-white data-[state=active]:shadow-sm transition-all"
+            >
+              <FileText className="h-4 w-4" />
+              Documents ({property.documents.length})
+              {property._count.documents > 0 && (
+                <Badge variant="secondary" className="ml-1 bg-gray-100 text-gray-600 text-xs px-2 py-0">
+                  {property._count.documents}
+                </Badge>
+              )}
+            </TabsTrigger>
+            <TabsTrigger 
+              value="history" 
+              className="flex items-center gap-2 px-6 py-3 rounded-lg data-[state=active]:bg-blue-500 data-[state=active]:text-white data-[state=active]:shadow-sm transition-all"
+            >
+              <Activity className="h-4 w-4" />
+              Activity History
+              {totalActivityCount > 0 && (
+                <Badge variant="secondary" className="ml-1 bg-gray-100 text-gray-600 text-xs px-2 py-0">
+                  {totalActivityCount}
+                </Badge>
+              )}
+            </TabsTrigger>
+            <TabsTrigger 
+              value="tax" 
+              className="flex items-center gap-2 px-6 py-3 rounded-lg data-[state=active]:bg-blue-500 data-[state=active]:text-white data-[state=active]:shadow-sm transition-all"
+            >
+              <DollarSign className="h-4 w-4" />
+              Real Property Tax ({property.rptRecords.length})
+             
+            </TabsTrigger>
+          </TabsList>
+        </div>
+
+        <TabsContent value="overview" className="space-y-8">
+          {isEditing ? (
+            <Form {...form}>
+              <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-8">
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+                  {/* Basic Information - Edit Mode */}
+                  <InfoCard 
+                    title="Basic Information" 
+                    description="Core property details and identification"
+                    icon={Info}
+                  >
+                    <div className="space-y-6">
+                      <FormField
+                        control={form.control}
+                        name="propertyName"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel className="text-sm font-medium text-gray-700">Property Name</FormLabel>
+                            <FormControl>
+                              <Input 
+                                {...field} 
+                                disabled={isLoading}
+                                className="border-gray-300 focus:border-blue-500 focus:ring-blue-500"
+                                placeholder="Enter property name"
+                              />
+                            </FormControl>
+                            <FormDescription className="text-xs text-gray-500">
+                              Optional display name for this property
+                            </FormDescription>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                      
+                      <div className="grid grid-cols-2 gap-4">
                         <FormField
                           control={form.control}
                           name="titleNumber"
                           render={({ field }) => (
                             <FormItem>
-                              <FormLabel className="flex items-center gap-2 text-slate-700">
-                                <Hash className="h-4 w-4" />
+                              <FormLabel className="text-sm font-medium text-gray-700">
                                 Title Number <span className="text-red-500">*</span>
                               </FormLabel>
                               <FormControl>
-                                <Input
-                                  placeholder="Enter title number"
+                                <Input 
+                                  {...field} 
                                   disabled={isLoading}
-                                  className="h-11 border-slate-300 focus:border-blue-500 focus:ring-blue-500/20"
-                                  {...field}
+                                  className="border-gray-300 focus:border-blue-500 focus:ring-blue-500"
+                                  placeholder="e.g., TCT-12345"
                                 />
                               </FormControl>
-                              <FormDescription className="text-slate-500">Unique identifier for the property title</FormDescription>
                               <FormMessage />
                             </FormItem>
                           )}
@@ -327,39 +653,62 @@ export function PropertyDetailEditPage({ businessUnitId, property }: PropertyDet
                           name="lotNumber"
                           render={({ field }) => (
                             <FormItem>
-                              <FormLabel className="flex items-center gap-2 text-slate-700">
-                                <Hash className="h-4 w-4" />
+                              <FormLabel className="text-sm font-medium text-gray-700">
                                 Lot Number <span className="text-red-500">*</span>
                               </FormLabel>
                               <FormControl>
-                                <Input
-                                  placeholder="Enter lot number"
+                                <Input 
+                                  {...field} 
                                   disabled={isLoading}
-                                  className="h-11 border-slate-300 focus:border-blue-500 focus:ring-blue-500/20"
-                                  {...field}
+                                  className="border-gray-300 focus:border-blue-500 focus:ring-blue-500"
+                                  placeholder="e.g., LOT-001"
                                 />
                               </FormControl>
                               <FormMessage />
                             </FormItem>
                           )}
                         />
+                      </div>
+
+                      <FormField
+                        control={form.control}
+                        name="location"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel className="text-sm font-medium text-gray-700">
+                              Location <span className="text-red-500">*</span>
+                            </FormLabel>
+                            <FormControl>
+                              <Input 
+                                {...field} 
+                                disabled={isLoading}
+                                className="border-gray-300 focus:border-blue-500 focus:ring-blue-500"
+                                placeholder="Complete address"
+                              />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+
+                      <div className="grid grid-cols-3 gap-4">
                         <FormField
                           control={form.control}
                           name="area"
                           render={({ field }) => (
                             <FormItem>
-                              <FormLabel className="flex items-center gap-2 text-slate-700">
-                                <Ruler className="h-4 w-4" />
+                              <FormLabel className="text-sm font-medium text-gray-700">
                                 Area (sqm) <span className="text-red-500">*</span>
                               </FormLabel>
                               <FormControl>
-                                <Input
-                                  type="number"
-                                  step="0.01"
-                                  placeholder="Enter area in square meters"
-                                  disabled={isLoading}
-                                  className="h-11 border-slate-300 focus:border-blue-500 focus:ring-blue-500/20"
+                                <Input 
+                                  type="number" 
+                                  step="0.01" 
                                   {...field}
+                                  onChange={(e) => field.onChange(parseFloat(e.target.value) || 0)}
+                                  disabled={isLoading}
+                                  className="border-gray-300 focus:border-blue-500 focus:ring-blue-500"
+                                  placeholder="0.00"
                                 />
                               </FormControl>
                               <FormMessage />
@@ -371,78 +720,25 @@ export function PropertyDetailEditPage({ businessUnitId, property }: PropertyDet
                           name="propertyClassification"
                           render={({ field }) => (
                             <FormItem>
-                              <FormLabel className="flex items-center gap-2 text-slate-700">
-                                <Tag className="h-4 w-4" />
-                                Property Classification <span className="text-red-500">*</span>
+                              <FormLabel className="text-sm font-medium text-gray-700">
+                                Classification <span className="text-red-500">*</span>
                               </FormLabel>
-                              <Select
-                                onValueChange={field.onChange}
+                              <Select 
+                                onValueChange={field.onChange} 
                                 defaultValue={field.value}
                                 disabled={isLoading}
                               >
                                 <FormControl>
-                                  <SelectTrigger className="h-11 border-slate-300 focus:border-blue-500 focus:ring-blue-500/20">
-                                    <SelectValue placeholder="Select classification" />
+                                  <SelectTrigger className="border-gray-300 focus:border-blue-500 focus:ring-blue-500">
+                                    <SelectValue />
                                   </SelectTrigger>
                                 </FormControl>
-                                <SelectContent className="bg-white border-slate-200">
-                                  {Object.values(PropertyClassification).map((type) => (
-                                    <SelectItem key={type} value={type}>
-                                      {type.replace(/_/g, ' ')}
-                                    </SelectItem>
-                                  ))}
-                                </SelectContent>
-                              </Select>
-                              <FormMessage />
-                            </FormItem>
-                          )}
-                        />
-                        <FormField
-                          control={form.control}
-                          name="location"
-                          render={({ field }) => (
-                            <FormItem>
-                              <FormLabel className="flex items-center gap-2 text-slate-700">
-                                <MapPin className="h-4 w-4" />
-                                Location <span className="text-red-500">*</span>
-                              </FormLabel>
-                              <FormControl>
-                                <Input
-                                  placeholder="Enter complete address/location"
-                                  disabled={isLoading}
-                                  className="h-11 border-slate-300 focus:border-blue-500 focus:ring-blue-500/20"
-                                  {...field}
-                                />
-                              </FormControl>
-                              <FormMessage />
-                            </FormItem>
-                          )}
-                        />
-                        <FormField
-                          control={form.control}
-                          name="status"
-                          render={({ field }) => (
-                            <FormItem>
-                              <FormLabel className="flex items-center gap-2 text-slate-700">
-                                <Tag className="h-4 w-4" />
-                                Status <span className="text-red-500">*</span>
-                              </FormLabel>
-                              <Select
-                                onValueChange={field.onChange}
-                                defaultValue={field.value}
-                                disabled={isLoading}
-                              >
-                                <FormControl>
-                                  <SelectTrigger className="h-11 border-slate-300 focus:border-blue-500 focus:ring-blue-500/20">
-                                    <SelectValue placeholder="Select status" />
-                                  </SelectTrigger>
-                                </FormControl>
-                                <SelectContent className="bg-white border-slate-200">
-                                  {Object.values(PropertyStatus).map((status) => (
-                                    <SelectItem key={status} value={status}>
+                                <SelectContent>
+                                  {Object.entries(classificationConfig).map(([key, config]) => (
+                                    <SelectItem key={key} value={key}>
                                       <div className="flex items-center gap-2">
-                                        <div className={`h-2 w-2 rounded-full ${getStatusDotClass(status)}`} />
-                                        {status.replace(/_/g, ' ')}
+                                        <config.icon className="h-4 w-4" />
+                                        {config.label}
                                       </div>
                                     </SelectItem>
                                   ))}
@@ -452,560 +748,693 @@ export function PropertyDetailEditPage({ businessUnitId, property }: PropertyDet
                             </FormItem>
                           )}
                         />
-                        <div className="lg:col-span-2">
-                           <FormField
-                            control={form.control}
-                            name="description"
-                            render={({ field }) => (
-                              <FormItem>
-                                <FormLabel className="text-slate-700">Property Description</FormLabel>
-                                <FormControl>
-                                  <Textarea
-                                    placeholder="Enter property description"
-                                    disabled={isLoading}
-                                    rows={4}
-                                    className="border-slate-300 focus:border-blue-500 focus:ring-blue-500/20"
-                                    {...field}
-                                  />
-                                </FormControl>
-                                <FormMessage />
-                              </FormItem>
-                            )}
-                          />
-                        </div>
+
+                        <FormField
+                        control={form.control}
+                        name="status"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel className="text-sm font-medium text-gray-700">
+                              Status <span className="text-red-500">*</span>
+                            </FormLabel>
+                            <Select 
+                              onValueChange={field.onChange} 
+                              defaultValue={field.value}
+                              disabled={isLoading}
+                            >
+                              <FormControl>
+                                <SelectTrigger className="border-gray-300 focus:border-blue-500 focus:ring-blue-500">
+                                  <SelectValue />
+                                </SelectTrigger>
+                              </FormControl>
+                              <SelectContent>
+                                {Object.entries(statusConfig).map(([key, config]) => (
+                                  <SelectItem key={key} value={key}>
+                                    <div className="flex items-center gap-2">
+                                      <div className={`w-2 h-2 rounded-full ${config.color}`} />
+                                      {config.label}
+                                    </div>
+                                  </SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
                       </div>
-                    </CardContent>
-                  </Card>
 
-                  <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
-                    <Card className="bg-white border-slate-200 shadow-sm">
-                      <CardHeader className="border-b border-slate-100 bg-gradient-to-r from-slate-50 to-white">
-                        <CardTitle className="text-lg flex items-center gap-3 text-slate-900">
-                          <User className="h-5 w-5 text-green-600" />
-                          Ownership Information
-                        </CardTitle>
-                      </CardHeader>
-                      <CardContent className="p-6 space-y-6">
-                        <FormField
-                          control={form.control}
-                          name="registeredOwner"
-                          render={({ field }) => (
-                            <FormItem>
-                              <FormLabel className="text-slate-700">Registered Owner <span className="text-red-500">*</span></FormLabel>
-                              <FormControl>
-                                <Input
-                                  placeholder="Enter registered owner name"
-                                  disabled={isLoading}
-                                  className="h-11 border-slate-300 focus:border-blue-500 focus:ring-blue-500/20"
-                                  {...field}
-                                />
-                              </FormControl>
-                              <FormMessage />
-                            </FormItem>
-                          )}
-                        />
-                        <FormField
-                          control={form.control}
-                          name="custodyOriginalTitle"
-                          render={({ field }) => (
-                            <FormItem>
-                              <FormLabel className="text-slate-700">Custody of Original Title</FormLabel>
-                              <FormControl>
-                                <Input
-                                  placeholder="Enter who has custody of original title"
-                                  disabled={isLoading}
-                                  className="h-11 border-slate-300 focus:border-blue-500 focus:ring-blue-500/20"
-                                  {...field}
-                                />
-                              </FormControl>
-                              <FormMessage />
-                            </FormItem>
-                          )}
-                        />
-                      </CardContent>
-                    </Card>
+                      
 
-                    <Card className="bg-white border-slate-200 shadow-sm">
-                      <CardHeader className="border-b border-slate-100 bg-gradient-to-r from-slate-50 to-white">
-                        <CardTitle className="text-lg flex items-center gap-3 text-slate-900">
-                          <CreditCard className="h-5 w-5 text-purple-600" />
-                          Financial Information
-                        </CardTitle>
-                      </CardHeader>
-                      <CardContent className="p-6 space-y-6">
-                        <FormField
-                          control={form.control}
-                          name="borrowerMortgagor"
-                          render={({ field }) => (
-                            <FormItem>
-                              <FormLabel className="text-slate-700">Borrower/Mortgagor</FormLabel>
-                              <FormControl>
-                                <Input
-                                  placeholder="Enter borrower/mortgagor name"
-                                  disabled={isLoading}
-                                  className="h-11 border-slate-300 focus:border-blue-500 focus:ring-blue-500/20"
-                                  {...field}
-                                />
-                              </FormControl>
-                              <FormMessage />
-                            </FormItem>
-                          )}
-                        />
-                        <FormField
-                          control={form.control}
-                          name="bank"
-                          render={({ field }) => (
-                            <FormItem>
-                              <FormLabel className="text-slate-700">Bank</FormLabel>
-                              <FormControl>
-                                <Input
-                                  placeholder="Enter bank name"
-                                  disabled={isLoading}
-                                  className="h-11 border-slate-300 focus:border-blue-500 focus:ring-blue-500/20"
-                                  {...field}
-                                />
-                              </FormControl>
-                              <FormMessage />
-                            </FormItem>
-                          )}
-                        />
-                      </CardContent>
-                    </Card>
+                      <FormField
+                        control={form.control}
+                        name="description"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel className="text-sm font-medium text-gray-700">Description</FormLabel>
+                            <FormControl>
+                              <Textarea 
+                                {...field} 
+                                rows={4} 
+                                disabled={isLoading}
+                                className="border-gray-300 focus:border-blue-500 focus:ring-blue-500 resize-none"
+                                placeholder="Additional property details..."
+                              />
+                            </FormControl>
+                            <FormDescription className="text-xs text-gray-500">
+                              Optional detailed description of the property
+                            </FormDescription>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                    </div>
+                  </InfoCard>
+
+                  {/* Ownership & Custody - Edit Mode */}
+                  <InfoCard 
+                    title="Ownership & Custody" 
+                    description="Property ownership and custodial information"
+                    icon={Users}
+                  >
+                    <div className="space-y-6">
+                      <FormField
+                        control={form.control}
+                        name="registeredOwner"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel className="text-sm font-medium text-gray-700">
+                              Registered Owner <span className="text-red-500">*</span>
+                            </FormLabel>
+                            <FormControl>
+                              <Input 
+                                {...field} 
+                                disabled={isLoading}
+                                className="border-gray-300 focus:border-blue-500 focus:ring-blue-500"
+                                placeholder="Full name of registered owner"
+                              />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                    </div>
+
+<div className="mt-6 space-y-6">
+  {/* Row with Custodian & Bank Selects */}
+  <div className="flex gap-2">
+    <div className="flex-1">
+      <FormField
+        control={form.control}
+        name="custodianId"
+        render={({ field }) => (
+          <FormItem>
+            <FormLabel className="text-sm font-medium text-gray-700">
+              Custodian <span className="text-red-500">*</span>
+            </FormLabel>
+            <Select 
+              onValueChange={field.onChange} 
+              defaultValue={field.value}
+              disabled={isLoading}
+            >
+              <FormControl>
+                <SelectTrigger className="border-gray-300 focus:border-blue-500 focus:ring-blue-500">
+                  <SelectValue placeholder="Select custodian" />
+                </SelectTrigger>
+              </FormControl>
+              <SelectContent>
+                {availableCustodians.map((custodian) => (
+                  <SelectItem key={custodian.id} value={custodian.id}>
+                    <div className="flex items-center gap-2">
+                      <Avatar className="h-6 w-6">
+                        <AvatarFallback className="text-xs bg-blue-100 text-blue-600">
+                          {custodian.name.charAt(0).toUpperCase()}
+                        </AvatarFallback>
+                      </Avatar>
+                      {custodian.name}
+                    </div>
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <FormMessage />
+          </FormItem>
+        )}
+      />
+    </div>
+
+    <div className="flex-1">
+      <FormField
+        control={form.control}
+        name="bankId"
+        render={({ field }) => (
+          <FormItem>
+            <FormLabel className="text-sm font-medium text-gray-700">
+              Associated Bank
+            </FormLabel>
+            <Select 
+              onValueChange={field.onChange} 
+              defaultValue={field.value || ''}
+              disabled={isLoading}
+            >
+              <FormControl>
+                <SelectTrigger className="border-gray-300 focus:border-blue-500 focus:ring-blue-500">
+                  <SelectValue placeholder="Select bank (optional)" />
+                </SelectTrigger>
+              </FormControl>
+              <SelectContent>
+                <SelectItem value="no-bank">
+                  <span className="text-gray-500">No Bank Selected</span>
+                </SelectItem>
+                {availableBanks.map((bank) => (
+                  <SelectItem key={bank.id} value={bank.id}>
+                    <div className="flex items-center gap-2">
+                      <Landmark className="h-4 w-4 text-blue-600" />
+                      <div>
+                        <div className="font-medium">{bank.name}</div>
+                        <div className="text-xs text-gray-500">{bank.branchName}</div>
+                      </div>
+                    </div>
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <FormMessage />
+          </FormItem>
+        )}
+      />
+    </div>
+  </div>
+
+  {/* Borrower/Mortgagor Input — full width */}
+  <div>
+    <FormField
+      control={form.control}
+      name="borrowerMortgagor"
+      render={({ field }) => (
+        <FormItem>
+          <FormLabel className="text-sm font-medium text-gray-700">
+            Borrower/Mortgagor
+          </FormLabel>
+          <FormControl>
+            <Input 
+              {...field} 
+              disabled={isLoading}
+              className="border-gray-300 focus:border-blue-500 focus:ring-blue-500 w-full"
+              placeholder="Name of borrower or mortgagor"
+            />
+          </FormControl>
+          <FormDescription className="text-xs text-gray-500">
+            Optional if property has mortgage
+          </FormDescription>
+          <FormMessage />
+        </FormItem>
+      )}
+    />
+  </div>
+</div>
+
+
+                    <div className="space-y-6">
+                    <FormField
+                      control={form.control}
+                      name="encumbranceMortgage"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel className="text-sm font-medium text-gray-700">Encumbrance/Mortgage Details</FormLabel>
+                          <FormControl>
+                            <Textarea 
+                              {...field} 
+                              rows={4} 
+                              disabled={isLoading}
+                              className="border-gray-300 focus:border-blue-500 focus:ring-blue-500 resize-none"
+                              placeholder="Details about any encumbrances or mortgages..."
+                            />
+                          </FormControl>
+                          <FormDescription className="text-xs text-gray-500">
+                            Include mortgage details, liens, or other encumbrances
+                          </FormDescription>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
                   </div>
-                  <Card className="bg-white border-slate-200 shadow-sm">
-                    <CardHeader className="border-b border-slate-100 bg-gradient-to-r from-slate-50 to-white">
-                      <CardTitle className="text-lg flex items-center gap-3 text-slate-900">
-                        <FileText className="h-5 w-5 text-orange-600" />
-                        Encumbrance/Remarks
-                      </CardTitle>
-                    </CardHeader>
-                    <CardContent className="p-6 space-y-6">
-                      <FormField
-                        control={form.control}
-                        name="encumbranceMortgage"
-                        render={({ field }) => (
-                          <FormItem>
-                            <FormLabel className="text-slate-700">Encumbrance/Mortgage</FormLabel>
-                            <FormControl>
-                              <Textarea
-                                placeholder="Enter encumbrance or mortgage details"
-                                disabled={isLoading}
-                                rows={3}
-                                className="border-slate-300 focus:border-blue-500 focus:ring-blue-500/20"
-                                {...field}
-                              />
-                            </FormControl>
-                            <FormMessage />
-                          </FormItem>
-                        )}
-                      />
-                      <FormField
-                        control={form.control}
-                        name="remarks"
-                        render={({ field }) => (
-                          <FormItem>
-                            <FormLabel className="text-slate-700">Remarks</FormLabel>
-                            <FormControl>
-                              <Textarea
-                                placeholder="Enter any additional remarks or notes"
-                                disabled={isLoading}
-                                rows={4}
-                                className="border-slate-300 focus:border-blue-500 focus:ring-blue-500/20"
-                                {...field}
-                              />
-                            </FormControl>
-                            <FormMessage />
-                          </FormItem>
-                        )}
-                      />
-                    </CardContent>
-                  </Card>
-                </form>
-              </Form>
-            ) : (
-              <div className="space-y-6">
-                <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-6">
-                  {/* Basic Information */}
-                  <Card className="bg-white border-slate-200 shadow-sm hover:shadow-md transition-all duration-200">
-                    <CardHeader className="border-b border-slate-100 bg-gradient-to-r from-slate-50 to-white">
-                      <CardTitle className="flex items-center gap-3 text-slate-900">
-                        <Building2 className="h-5 w-5 text-blue-600" />
-                        Basic Information
-                      </CardTitle>
-                    </CardHeader>
-                    <CardContent className="p-6 space-y-4">
-                      <div className="flex items-center justify-between">
-                        <span className="text-sm font-medium text-slate-500">Title Number</span>
-                        <p className="text-sm font-semibold text-slate-900 font-mono">{property.titleNumber}</p>
-                      </div>
-                      <div className="flex items-center justify-between">
-                        <span className="text-sm font-medium text-slate-500">Lot Number</span>
-                        <p className="text-sm font-semibold text-slate-900">{property.lotNumber}</p>
-                      </div>
-                      <div className="flex items-center justify-between">
-                        <span className="text-sm font-medium text-slate-500">Area</span>
-                        <p className="text-sm font-semibold text-slate-900">{formatArea(Number(property.area))} sqm</p>
-                      </div>
-                      <div className="flex items-center justify-between">
-                        <span className="text-sm font-medium text-slate-500">Classification</span>
-                        {getClassificationBadge(property.propertyClassification)}
-                      </div>
-                      <div className="flex items-center justify-between">
-                        <span className="text-sm font-medium text-slate-500">Tax Declaration</span>
-                        <p className="text-sm font-semibold text-slate-900">{property.taxDeclaration || 'Not specified'}</p>
-                      </div>
-                      {property.description && (
-                        <div>
-                          <label className="text-sm font-medium text-slate-500">Description</label>
-                          <p className="text-sm text-slate-800 mt-1">{property.description}</p>
-                        </div>
-                      )}
-                    </CardContent>
-                  </Card>
 
-                  {/* Ownership Information */}
-                  <Card className="bg-white border-slate-200 shadow-sm hover:shadow-md transition-all duration-200">
-                    <CardHeader className="border-b border-slate-100 bg-gradient-to-r from-slate-50 to-white">
-                      <CardTitle className="flex items-center gap-3 text-slate-900">
-                        <User className="h-5 w-5 text-green-600" />
-                        Ownership Information
-                      </CardTitle>
-                    </CardHeader>
-                    <CardContent className="p-6 space-y-4">
-                      <div className="flex items-center justify-between">
-                        <span className="text-sm font-medium text-slate-500">Registered Owner</span>
-                        <p className="text-sm font-semibold text-slate-900">{property.registeredOwner}</p>
-                      </div>
-                      <div className="flex items-center justify-between">
-                        <span className="text-sm font-medium text-slate-500">Custody of Original Title</span>
-                        <p className="text-sm font-semibold text-slate-900">{property.custodyOriginalTitle || 'Not specified'}</p>
-                      </div>
-                      {property.encumbranceMortgage && (
-                        <div>
-                          <label className="text-sm font-medium text-slate-500">Encumbrance/Mortgage</label>
-                          <p className="text-sm text-slate-800 mt-1">{property.encumbranceMortgage}</p>
-                        </div>
+                  <div className='space-y-2 mt-4'>                     
+                    <FormField
+                      control={form.control}
+                      name="remarks"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel className="text-sm font-medium text-gray-700">Remarks</FormLabel>
+                          <FormControl>
+                            <Textarea 
+                              {...field} 
+                              rows={4} 
+                              disabled={isLoading}
+                              className="border-gray-300 focus:border-blue-500 focus:ring-blue-500 resize-none"
+                              placeholder="Additional notes or comments..."
+                            />
+                          </FormControl>
+                          <FormDescription className="text-xs text-gray-500">
+                            Any additional notes or special considerations
+                          </FormDescription>
+                          <FormMessage />
+                        </FormItem>
                       )}
-                      {property.borrowerMortgagor && (
-                        <div>
-                          <label className="text-sm font-medium text-slate-500">Borrower/Mortgagor</label>
-                          <p className="text-sm text-slate-800 mt-1">{property.borrowerMortgagor}</p>
-                        </div>
-                      )}
-                      {property.bank && (
-                        <div>
-                          <label className="text-sm font-medium text-slate-500">Bank</label>
-                          <p className="text-sm text-slate-800 mt-1">{property.bank}</p>
-                        </div>
-                      )}
-                    </CardContent>
-                  </Card>
-
-                  {/* System Information */}
-                  <Card className="bg-white border-slate-200 shadow-sm hover:shadow-md transition-all duration-200">
-                    <CardHeader className="border-b border-slate-100 bg-gradient-to-r from-slate-50 to-white">
-                      <CardTitle className="flex items-center gap-3 text-slate-900">
-                        <Clock className="h-5 w-5 text-purple-600" />
-                        System Information
-                      </CardTitle>
-                    </CardHeader>
-                    <CardContent className="p-6 space-y-4">
-                      <div className="space-y-2">
-                        <label className="text-sm font-medium text-slate-500">Created By</label>
-                        <p className="text-sm font-semibold text-slate-900">{getUserName(property.createdBy)}</p>
-                        <p className="text-xs text-slate-600">
-                          {format(new Date(property.createdAt), 'MMM dd, yyyy HH:mm')}
-                        </p>
-                      </div>
-                      <div className="space-y-2">
-                        <label className="text-sm font-medium text-slate-500">Last Updated</label>
-                        <p className="text-sm font-semibold text-slate-900">
-                          {property.updatedBy ? getUserName(property.updatedBy) : 'Never updated'}
-                        </p>
-                        <p className="text-xs text-slate-600">
-                          {format(new Date(property.updatedAt), 'MMM dd, yyyy HH:mm')}
-                        </p>
-                      </div>
-                      <div className="space-y-2">
-                        <label className="text-sm font-medium text-slate-500">Business Unit</label>
-                        <p className="text-sm font-semibold text-slate-900">{property.businessUnit.name}</p>
-                      </div>
-                      {property.remarks && (
-                        <div className="space-y-2">
-                          <label className="text-sm font-medium text-slate-500">Remarks</label>
-                          <p className="text-sm text-slate-800">{property.remarks}</p>
-                        </div>
-                      )}
-                    </CardContent>
-                  </Card>
+                    />
+                  </div>
+                  </InfoCard>
                 </div>
-              </div>
-            )}
-          </TabsContent>
 
-          <TabsContent value="documents" className="space-y-4">
-            {property.documents.length === 0 ? (
-              <div className="text-center py-12 bg-white rounded-lg border border-slate-200 shadow-sm">
-                <FileText className="h-12 w-12 text-slate-300 mx-auto mb-4" />
-                <h3 className="text-lg font-medium text-slate-500 mb-2">No documents found</h3>
-                <p className="text-sm text-slate-400">
-                  No documents have been uploaded for this property yet.
-                </p>
+ 
+              </form>
+            </Form>
+          ) : (
+            /* View Mode */
+            <div className="space-y-8">
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+                {/* Basic Information - View Mode */}
+                <InfoCard 
+                  title="Basic Information" 
+                  description="Core property details and identification"
+                  icon={Info}
+                >
+                  <div className="space-y-1">
+                    <FieldRow label="Title Number" value={property.titleNumber} icon={Hash} />
+                    <FieldRow label="Lot Number" value={property.lotNumber} icon={Building2} />
+                    <FieldRow label="Location" value={property.location} icon={MapPin} />
+                    <FieldRow 
+                      label="Area" 
+                      value={`${formatArea(Number(property.area))} sqm`}
+                      icon={TrendingUp}
+                    />
+                    <FieldRow 
+                      label="Classification" 
+                      value={
+                        <Badge variant="outline" className="font-medium">
+                          <ClassificationIcon className="h-3 w-3 mr-1" />
+                          {currentClassification.label}
+                        </Badge>
+                      }
+                      icon={currentClassification.icon}
+                    />
+                  </div>
+                  
+                  {property.description && (
+                    <>
+                      <Separator className="my-4" />
+                      <div>
+                        <h4 className="text-sm font-medium text-gray-700 mb-2 flex items-center gap-2">
+                          <Info className="h-4 w-4" />
+                          Description
+                        </h4>
+                        <p className="text-sm text-gray-600 leading-relaxed bg-gray-50 p-3 rounded-lg">
+                          {property.description}
+                        </p>
+                      </div>
+                    </>
+                  )}
+                </InfoCard>
+
+                {/* Ownership Information - View Mode */}
+                <InfoCard 
+                  title="Ownership & Custody" 
+                  description="Property ownership and custodial information"
+                  icon={Users}
+                >
+                  <div className="space-y-1">
+                    <FieldRow 
+                      label="Registered Owner" 
+                      value={property.registeredOwner} 
+                      icon={User} 
+                    />
+                    <FieldRow 
+                      label="Custodian" 
+                      value={
+                        <div className="flex items-center gap-2">
+                          <Avatar className="h-6 w-6">
+                            <AvatarFallback className="text-xs bg-blue-100 text-blue-600">
+                              {getUserInitials(property.custodian)}
+                            </AvatarFallback>
+                          </Avatar>
+                          <span className="font-medium">{getUserName(property.custodian)}</span>
+                        </div>
+                      }
+                      icon={Shield}
+                    />
+                    <FieldRow 
+                      label="Borrower/Mortgagor" 
+                      value={property.borrowerMortgagor || (
+                        <span className="text-gray-400 italic">Not specified</span>
+                      )}
+                      icon={CreditCard}
+                    />
+                    <FieldRow 
+                      label="Associated Bank" 
+                      value={property.bank ? (
+                        <div className="flex items-center gap-2">
+                          <Landmark className="h-4 w-4 text-blue-600" />
+                          <div className="text-right">
+                            <div className="font-medium">{property.bank.name}</div>
+                            <div className="text-xs text-gray-500">{property.bank.branchName}</div>
+                          </div>
+                        </div>
+                      ) : (
+                        <span className="text-gray-400 italic">No bank associated</span>
+                      )}
+                      icon={Landmark}
+                    />
+                    <FieldRow 
+                      label="Tax Declaration" 
+                      value={property.taxDeclaration || (
+                        <span className="text-gray-400 italic">Not specified</span>
+                      )}
+                      icon={FileText}
+                    />
+                  </div>
+                </InfoCard>
               </div>
-            ) : (
-              <div className="space-y-3">
-                {property.documents.map((document) => (
-                  <Card key={document.id} className="bg-white border-slate-200 shadow-sm hover:shadow-md transition-all duration-200">
-                    <CardContent className="p-4 flex items-center justify-between">
-                      <div className="flex items-center space-x-3">
-                        <FileText className="h-5 w-5 text-slate-500 flex-shrink-0" />
-                        <div>
-                          <p className="text-sm font-medium text-slate-900">{document.originalName}</p>
-                          <p className="text-xs text-slate-600 mt-1">
-                            <span className="capitalize">{document.documentType.replace(/_/g, ' ')}</span> •
-                            {(document.fileSize / 1024 / 1024).toFixed(2)} MB •
-                            Uploaded by {getUserName(document.createdBy)} on {format(new Date(document.createdAt), 'MMM dd, yyyy')}
+
+              {/* Quick Stats Cards */}
+              <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
+                <Card className="shadow-sm border-gray-200">
+                  <CardContent className="p-6">
+                    <div className="flex items-center gap-4">
+                      <div className="p-3 bg-blue-50 rounded-xl">
+                        <FileText className="h-6 w-6 text-blue-600" />
+                      </div>
+                      <div>
+                        <p className="text-2xl font-bold text-gray-900">{property._count.documents}</p>
+                        <p className="text-sm text-gray-500">Documents</p>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+
+                <Card className="shadow-sm border-gray-200">
+                  <CardContent className="p-6">
+                    <div className="flex items-center gap-4">
+                      <div className="p-3 bg-green-50 rounded-xl">
+                        <Activity className="h-6 w-6 text-green-600" />
+                      </div>
+                      <div>
+                        <p className="text-2xl font-bold text-gray-900">{totalActivityCount}</p>
+                        <p className="text-sm text-gray-500">Activities</p>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+
+                <Card className="shadow-sm border-gray-200">
+                  <CardContent className="p-6">
+                    <div className="flex items-center gap-4">
+                      <div className="p-3 bg-amber-50 rounded-xl">
+                        <DollarSign className="h-6 w-6 text-amber-600" />
+                      </div>
+                      <div>
+                        <p className="text-2xl font-bold text-gray-900">{property._count.rptRecords}</p>
+                        <p className="text-sm text-gray-500">Tax Records</p>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+
+                <Card className="shadow-sm border-gray-200">
+                  <CardContent className="p-6">
+                    <div className="flex items-center gap-4">
+                      <div className="p-3 bg-purple-50 rounded-xl">
+                        <TrendingUp className="h-6 w-6 text-purple-600" />
+                      </div>
+                      <div>
+                        <p className="text-2xl font-bold text-gray-900">{formatArea(Number(property.area))}</p>
+                        <p className="text-sm text-gray-500">Sq Meters</p>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+              </div>
+
+              {/* Additional Information - View Mode */}
+              {(property.encumbranceMortgage || property.remarks) && (
+                <InfoCard 
+                  title="Additional Information" 
+                  description="Mortgage details and additional notes"
+                  icon={FileText}
+                >
+                  <div className="space-y-6">
+                    {property.encumbranceMortgage && (
+                      <div>
+                        <h4 className="text-sm font-medium text-gray-700 mb-3 flex items-center gap-2">
+                          <AlertTriangle className="h-4 w-4 text-amber-500" />
+                          Encumbrance/Mortgage Details
+                        </h4>
+                        <div className="bg-amber-50 border border-amber-200 rounded-lg p-4">
+                          <p className="text-sm text-gray-700 leading-relaxed">
+                            {property.encumbranceMortgage}
                           </p>
                         </div>
                       </div>
-                      <div className="flex items-center space-x-2">
-                        <Button variant="ghost" size="icon" className="h-8 w-8 text-slate-600 hover:bg-blue-50 hover:text-blue-600">
-                          <Eye className="h-4 w-4" />
-                        </Button>
-                        <Button variant="ghost" size="icon" className="h-8 w-8 text-slate-600 hover:bg-blue-50 hover:text-blue-600">
-                          <Download className="h-4 w-4" />
-                        </Button>
-                      </div>
-                    </CardContent>
-                  </Card>
-                ))}
-              </div>
-            )}
-          </TabsContent>
-
-          <TabsContent value="workflow" className="space-y-4">
-            {property.approvals.length > 0 && (
-              <Card className="bg-white border-slate-200 shadow-sm">
-                <CardHeader className="border-b border-slate-100 bg-gradient-to-r from-slate-50 to-white">
-                  <CardTitle className="text-lg flex items-center gap-3 text-slate-900">
-                    <CheckCircle className="h-5 w-5 text-green-600" />
-                    Approvals
-                  </CardTitle>
-                </CardHeader>
-                <CardContent className="p-6 space-y-3">
-                  {property.approvals.map((approval) => (
-                    <div key={approval.id} className="p-4 border border-slate-200 rounded-lg bg-slate-50/50 flex items-center justify-between">
-                      <div className="space-y-1">
-                        <p className="text-sm font-medium text-slate-900">
-                          {getUserName(approval.approver)}
-                        </p>
-                        <p className="text-xs text-slate-600">
-                          {approval.approvedAt
-                            ? format(new Date(approval.approvedAt), 'MMM dd, yyyy HH:mm')
-                            : format(new Date(approval.createdAt), 'MMM dd, yyyy HH:mm')}
-                        </p>
-                        {approval.comments && (
-                          <p className="text-xs text-slate-500 mt-1 italic">{approval.comments}</p>
-                        )}
-                      </div>
-                      <Badge variant="outline" className={approval.status === 'APPROVED' ? 'bg-green-100 text-green-800 border-green-200' : approval.status === 'REJECTED' ? 'bg-red-100 text-red-800 border-red-200' : 'bg-slate-100 text-slate-600 border-slate-200'}>
-                        {approval.status.replace(/_/g, ' ')}
-                      </Badge>
-                    </div>
-                  ))}
-                </CardContent>
-              </Card>
-            )}
-
-            {property.releases.length > 0 && (
-              <Card className="bg-white border-slate-200 shadow-sm">
-                <CardHeader className="border-b border-slate-100 bg-gradient-to-r from-slate-50 to-white">
-                  <CardTitle className="text-lg flex items-center gap-3 text-slate-900">
-                    <Send className="h-5 w-5 text-blue-600" />
-                    Releases
-                  </CardTitle>
-                </CardHeader>
-                <CardContent className="p-6 space-y-3">
-                  {property.releases.map((release) => (
-                    <div key={release.id} className="p-4 border border-slate-200 rounded-lg bg-slate-50/50">
-                      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 text-sm">
-                        <div className="space-y-1">
-                          <label className="font-medium text-slate-500">Released By</label>
-                          <p className="text-slate-900 font-medium">{release.releasedBy ? getUserName(release.releasedBy) : 'Not specified'}</p>
-                        </div>
-                        <div className="space-y-1">
-                          <label className="font-medium text-slate-500">Date Released</label>
-                          <p className="text-slate-900 font-medium">{release.dateReleased ? format(new Date(release.dateReleased), 'MMM dd, yyyy') : 'Not specified'}</p>
-                        </div>
-                        <div className="space-y-1">
-                          <label className="font-medium text-slate-500">Approved By</label>
-                          <p className="text-slate-900 font-medium">{release.approvedBy ? getUserName(release.approvedBy) : 'Not specified'}</p>
-                        </div>
-                        <div className="space-y-1">
-                          <label className="font-medium text-slate-500">Received By</label>
-                          <p className="text-slate-900 font-medium">{release.receivedBy ? getUserName(release.receivedBy) : 'Not specified'}</p>
+                    )}
+                    
+                    {property.remarks && (
+                      <div>
+                        <h4 className="text-sm font-medium text-gray-700 mb-3 flex items-center gap-2">
+                          <FileText className="h-4 w-4 text-blue-500" />
+                          Remarks
+                        </h4>
+                        <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+                          <p className="text-sm text-gray-700 leading-relaxed">
+                            {property.remarks}
+                          </p>
                         </div>
                       </div>
-                      {release.purposeOfRelease && (
-                        <div className="mt-4 space-y-1">
-                          <label className="font-medium text-slate-500 text-sm">Purpose</label>
-                          <p className="text-sm text-slate-800">{release.purposeOfRelease}</p>
-                        </div>
-                      )}
-                      {release.transmittalNumber && (
-                        <div className="mt-4 space-y-1">
-                          <label className="font-medium text-slate-500 text-sm">Transmittal Number</label>
-                          <p className="text-sm font-mono text-slate-800">{release.transmittalNumber}</p>
-                        </div>
-                      )}
-                    </div>
-                  ))}
-                </CardContent>
-              </Card>
-            )}
-
-            {property.turnovers.length > 0 && (
-              <Card className="bg-white border-slate-200 shadow-sm">
-                <CardHeader className="border-b border-slate-100 bg-gradient-to-r from-slate-50 to-white">
-                  <CardTitle className="text-lg flex items-center gap-3 text-slate-900">
-                    <ArrowLeftRight className="h-5 w-5 text-orange-600" />
-                    Turnovers
-                  </CardTitle>
-                </CardHeader>
-                <CardContent className="p-6 space-y-3">
-                  {property.turnovers.map((turnover) => (
-                    <div key={turnover.id} className="p-4 border border-slate-200 rounded-lg bg-slate-50/50">
-                      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 text-sm">
-                        <div className="space-y-1">
-                          <label className="font-medium text-slate-500">Turned Over By</label>
-                          <p className="text-slate-900 font-medium">{turnover.turnedOverBy ? getUserName(turnover.turnedOverBy) : 'Not specified'}</p>
-                        </div>
-                        <div className="space-y-1">
-                          <label className="font-medium text-slate-500">Date</label>
-                          <p className="text-slate-900 font-medium">{turnover.turnedOverDate ? format(new Date(turnover.turnedOverDate), 'MMM dd, yyyy') : 'Not specified'}</p>
-                        </div>
-                        <div className="space-y-1">
-                          <label className="font-medium text-slate-500">Received By</label>
-                          <p className="text-slate-900 font-medium">{turnover.receivedBy ? getUserName(turnover.receivedBy) : 'Not specified'}</p>
-                        </div>
-                      </div>
-                    </div>
-                  ))}
-                </CardContent>
-              </Card>
-            )}
-
-            {property.returns.length > 0 && (
-              <Card className="bg-white border-slate-200 shadow-sm">
-                <CardHeader className="border-b border-slate-100 bg-gradient-to-r from-slate-50 to-white">
-                  <CardTitle className="text-lg flex items-center gap-3 text-slate-900">
-                    <RotateCcw className="h-5 w-5 text-red-600" />
-                    Returns
-                  </CardTitle>
-                </CardHeader>
-                <CardContent className="p-6 space-y-3">
-                  {property.returns.map((returnRecord) => (
-                    <div key={returnRecord.id} className="p-4 border border-slate-200 rounded-lg bg-slate-50/50">
-                      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 text-sm">
-                        <div className="space-y-1">
-                          <label className="font-medium text-slate-500">Returned By</label>
-                          <p className="text-slate-900 font-medium">{returnRecord.returnedBy ? getUserName(returnRecord.returnedBy) : 'Not specified'}</p>
-                        </div>
-                        <div className="space-y-1">
-                          <label className="font-medium text-slate-500">Date Returned</label>
-                          <p className="text-slate-900 font-medium">{returnRecord.dateReturned ? format(new Date(returnRecord.dateReturned), 'MMM dd, yyyy') : 'Not specified'}</p>
-                        </div>
-                        <div className="space-y-1">
-                          <label className="font-medium text-slate-500">Received By</label>
-                          <p className="text-slate-900 font-medium">{returnRecord.receivedBy ? getUserName(returnRecord.receivedBy) : 'Not specified'}</p>
-                        </div>
-                      </div>
-                    </div>
-                  ))}
-                </CardContent>
-              </Card>
-            )}
-
-            {(property.approvals.length === 0 && property.releases.length === 0 &&
-              property.turnovers.length === 0 && property.returns.length === 0) && (
-                <div className="text-center py-12 bg-white rounded-lg border border-slate-200 shadow-sm">
-                  <ArrowLeftRight className="h-12 w-12 text-slate-300 mx-auto mb-4" />
-                  <h3 className="text-lg font-medium text-slate-500 mb-2">No workflow history</h3>
-                  <p className="text-sm text-slate-400">
-                    No approvals, releases, turnovers, or returns have been recorded for this property.
-                  </p>
-                </div>
+                    )}
+                  </div>
+                </InfoCard>
               )}
-          </TabsContent>
+            </div>
+          )}
+        </TabsContent>
 
-          <TabsContent value="tax" className="space-y-4">
-            {property.rptRecords.length === 0 ? (
-              <div className="text-center py-12 bg-white rounded-lg border border-slate-200 shadow-sm">
-                <DollarSign className="h-12 w-12 text-slate-300 mx-auto mb-4" />
-                <h3 className="text-lg font-medium text-slate-500 mb-2">No tax records found</h3>
-                <p className="text-sm text-slate-400">
-                  No real property tax records have been added for this property yet.
+        <TabsContent value="documents" className="space-y-6">
+          <InfoCard 
+            title="Property Documents" 
+            description="All documents related to this property"
+            icon={FileText}
+          >
+            {property.documents.length === 0 ? (
+              <div className="text-center py-16">
+                <div className="p-4 bg-gray-50 rounded-full w-20 h-20 flex items-center justify-center mx-auto mb-4">
+                  <Archive className="h-10 w-10 text-gray-300" />
+                </div>
+                <h3 className="text-lg font-medium text-gray-900 mb-2">No documents found</h3>
+                <p className="text-gray-500 max-w-md mx-auto">
+                  No documents have been uploaded for this property yet. 
+                  Documents will appear here once they are added.
                 </p>
               </div>
             ) : (
-              <div className="space-y-3">
-                {property.rptRecords.map((rpt) => (
-                  <Card key={rpt.id} className="bg-white border-slate-200 shadow-sm hover:shadow-md transition-all duration-200">
-                    <CardContent className="p-6">
-                      <div className="flex items-center justify-between mb-4 pb-2 border-b border-slate-100">
-                        <h4 className="font-medium text-slate-900">Tax Year {rpt.taxYear}</h4>
-                        <Badge variant="outline" className={rpt.status === 'FULLY_PAID' ? 'bg-green-100 text-green-800 border-green-200' : rpt.status === 'PARTIALLY_PAID' ? 'bg-orange-100 text-orange-800 border-orange-200' : 'bg-red-100 text-red-800 border-red-200'}>
-                          {rpt.status.replace(/_/g, ' ')}
-                        </Badge>
-                      </div>
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-4 text-sm">
-                        <div className="space-y-1">
-                          <label className="font-medium text-slate-500">Assessed Value</label>
-                          <p className="text-slate-900 font-medium">₱{Number(rpt.assessedValue).toLocaleString()}</p>
+              <div className="space-y-4">
+                {property.documents.map((doc, index) => {
+                  const DocIcon = getDocumentIcon(doc.mimeType);
+                  return (
+                    <div 
+                      key={doc.id} 
+                      className="flex items-center justify-between p-4 border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors"
+                    >
+                      <div className="flex items-center gap-4">
+                        <div className="p-3 bg-blue-50 rounded-lg">
+                          <DocIcon className="h-5 w-5 text-blue-600" />
                         </div>
-                        <div className="space-y-1">
-                          <label className="font-medium text-slate-500">Total Amount Due</label>
-                          <p className="text-slate-900 font-medium">₱{Number(rpt.totalAmountDue).toLocaleString()}</p>
-                        </div>
-                        <div className="space-y-1">
-                          <label className="font-medium text-slate-500">Payment Schedule</label>
-                          <p className="text-slate-900 font-medium">{rpt.paymentSchedule.replace(/_/g, ' ')}</p>
-                        </div>
-                        <div className="space-y-1">
-                          <label className="font-medium text-slate-500">Due Date</label>
-                          <p className="text-slate-900 font-medium">{format(new Date(rpt.dueDate), 'MMM dd, yyyy')}</p>
+                        <div>
+                          <p className="font-medium text-gray-900">{doc.fileName}</p>
+                          <div className="flex items-center gap-4 mt-1">
+                            <span className="text-xs text-gray-500 bg-gray-100 px-2 py-1 rounded">
+                              {doc.mimeType}
+                            </span>
+                            <span className="text-xs text-gray-500">
+                              Uploaded {format(new Date(doc.createdAt), 'MMM dd, yyyy')}
+                            </span>
+                          </div>
                         </div>
                       </div>
-                    </CardContent>
-                  </Card>
-                ))}
+                      <div className="flex items-center gap-2">
+                        <Button variant="outline" size="sm" className="flex items-center gap-2">
+                          <Eye className="h-4 w-4" />
+                          View
+                        </Button>
+                        <Button variant="outline" size="sm" className="flex items-center gap-2">
+                          <Download className="h-4 w-4" />
+                          Download
+                        </Button>
+                      </div>
+                    </div>
+                  );
+                })}
               </div>
             )}
-          </TabsContent>
-        </div>
+          </InfoCard>
+        </TabsContent>
+
+        <TabsContent value="history" className="space-y-6">
+          {property.approvalRequests.length === 0 && 
+           property.releases.length === 0 && 
+           property.turnovers.length === 0 && 
+           property.returns.length === 0 ? (
+            <InfoCard 
+              title="Activity History" 
+              description="Track all activities and changes for this property"
+              icon={Activity}
+            >
+              <div className="text-center py-16">
+                <div className="p-4 bg-gray-50 rounded-full w-20 h-20 flex items-center justify-center mx-auto mb-4">
+                  <Activity className="h-10 w-10 text-gray-300" />
+                </div>
+                <h3 className="text-lg font-medium text-gray-900 mb-2">No activity history</h3>
+                <p className="text-gray-500 max-w-md mx-auto">
+                  No activities have been recorded for this property yet. 
+                  Activities will appear here as they occur.
+                </p>
+              </div>
+            </InfoCard>
+          ) : (
+            <div className="space-y-6">
+              {/* Approval Requests */}
+              {property.approvalRequests.length > 0 && (
+                <InfoCard 
+                  title="Approval Requests" 
+                  description="All approval requests for this property"
+                  icon={CheckCircle}
+                >
+                  <div className="space-y-4">
+                    {property.approvalRequests.map((approval) => (
+                      <div 
+                        key={approval.id} 
+                        className="flex items-center justify-between p-4 border border-gray-200 rounded-lg"
+                      >
+                        <div className="flex items-center gap-4">
+                          <div className="p-2 bg-blue-50 rounded-lg">
+                            <CheckCircle className="h-5 w-5 text-blue-600" />
+                          </div>
+                          <div>
+                            <p className="font-medium text-gray-900">
+                              {approval.entityType.replace(/_/g, ' ')} Request
+                            </p>
+                            <div className="flex items-center gap-4 text-sm text-gray-500 mt-1">
+                              <span className="flex items-center gap-1">
+                                <User className="h-3 w-3" />
+                                Requested by {getUserName(approval.requestedBy)}
+                              </span>
+                              <span className="flex items-center gap-1">
+                                <Calendar className="h-3 w-3" />
+                                {format(new Date(approval.createdAt), 'MMM dd, yyyy HH:mm')}
+                              </span>
+                            </div>
+                          </div>
+                        </div>
+                        <Badge 
+                          variant={
+                            approval.status === 'APPROVED' 
+                              ? 'default' 
+                              : approval.status === 'REJECTED' 
+                              ? 'destructive' 
+                              : 'secondary'
+                          }
+                          className="flex items-center gap-1"
+                        >
+                          {approval.status === 'APPROVED' && <CheckCircle className="h-3 w-3" />}
+                          {approval.status === 'REJECTED' && <XCircle className="h-3 w-3" />}
+                          {approval.status === 'PENDING' && <Clock className="h-3 w-3" />}
+                          {approval.status}
+                        </Badge>
+                      </div>
+                    ))}
+                  </div>
+                </InfoCard>
+              )}
+
+              {/* Add similar sections for releases, turnovers, returns */}
+            </div>
+          )}
+        </TabsContent>
+
+        <TabsContent value="tax" className="space-y-6">
+          <InfoCard 
+            title="Real Property Tax Records" 
+            description="Tax assessment and payment records for this property"
+            icon={DollarSign}
+          >
+            {property.rptRecords.length === 0 ? (
+              <div className="text-center py-16">
+                <div className="p-4 bg-gray-50 rounded-full w-20 h-20 flex items-center justify-center mx-auto mb-4">
+                  <DollarSign className="h-10 w-10 text-gray-300" />
+                </div>
+                <h3 className="text-lg font-medium text-gray-900 mb-2">No tax records found</h3>
+                <p className="text-gray-500 max-w-md mx-auto">
+                  No tax records have been added for this property yet. 
+                  Tax records will appear here once they are created.
+                </p>
+              </div>
+            ) : (
+              <div className="overflow-hidden border border-gray-200 rounded-lg">
+                <Table>
+                  <TableHeader>
+                    <TableRow className="bg-gray-50">
+                      <TableHead className="font-semibold text-gray-900">Tax Year</TableHead>
+                      <TableHead className="font-semibold text-gray-900">Assessed Value</TableHead>
+                      <TableHead className="font-semibold text-gray-900">Amount Due</TableHead>
+                      <TableHead className="font-semibold text-gray-900">Payment Schedule</TableHead>
+                      <TableHead className="font-semibold text-gray-900">Due Date</TableHead>
+                      <TableHead className="font-semibold text-gray-900">Status</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {property.rptRecords.map((rpt) => (
+                      <TableRow key={rpt.id} className="hover:bg-gray-50">
+                        <TableCell className="font-medium text-gray-900">
+                          {rpt.taxYear}
+                        </TableCell>
+                        <TableCell className="font-mono">
+                          {formatCurrency(Number(rpt.assessedValue))}
+                        </TableCell>
+                        <TableCell className="font-mono">
+                          {formatCurrency(Number(rpt.totalAmountDue))}
+                        </TableCell>
+                        <TableCell>
+                          <Badge variant="outline" className="capitalize">
+                            {rpt.paymentSchedule.replace(/_/g, ' ').toLowerCase()}
+                          </Badge>
+                        </TableCell>
+                        <TableCell className="text-gray-600">
+                          {format(new Date(rpt.dueDate), 'MMM dd, yyyy')}
+                        </TableCell>
+                        <TableCell>
+                          <Badge
+                            variant={
+                              rpt.status === 'FULLY_PAID' 
+                                ? 'default' 
+                                : rpt.status === 'PARTIALLY_PAID' 
+                                ? 'secondary' 
+                                : 'destructive'
+                            }
+                            className="flex items-center gap-1 w-fit"
+                          >
+                            {rpt.status === 'FULLY_PAID' && <CheckCircle className="h-3 w-3" />}
+                            {rpt.status === 'PARTIALLY_PAID' && <Clock className="h-3 w-3" />}
+                            {rpt.status === 'UNPAID' && <AlertTriangle className="h-3 w-3" />}
+                            {rpt.status.replace(/_/g, ' ')}
+                          </Badge>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </div>
+            )}
+          </InfoCard>
+        </TabsContent>
       </Tabs>
     </div>
   );
 }
-
-// Helper function for status dot colors in Select
-const getStatusDotClass = (status: PropertyStatus) => {
-  switch (status) {
-    case PropertyStatus.ACTIVE:
-      return 'bg-green-500';
-    case PropertyStatus.PENDING:
-      return 'bg-yellow-500';
-    case PropertyStatus.UNDER_REVIEW:
-      return 'bg-blue-500';
-    case PropertyStatus.INACTIVE:
-      return 'bg-gray-500';
-    case PropertyStatus.RELEASED:
-      return 'bg-blue-500';
-    case PropertyStatus.RETURNED:
-      return 'bg-purple-500';
-    case PropertyStatus.DISPUTED:
-      return 'bg-red-500';
-    default:
-      return 'bg-gray-500';
-  }
-};

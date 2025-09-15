@@ -4,7 +4,7 @@
 import React, { useState, useCallback, useTransition } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent, CardFooter } from '@/components/ui/card';
 import {
   Breadcrumb,
   BreadcrumbItem,
@@ -23,20 +23,21 @@ import {
   PaginationPrevious,
 } from '@/components/ui/pagination';
 import { AlertModal } from '@/components/modals/alert-modal';
-import { PropertyFiltersComponent } from '@/components/properties/property-filters';
 import { PropertyTable } from '@/components/properties/property-table';
 import { 
   Plus, 
   RefreshCw, 
   Building2, 
   Home, 
-  Filter, 
   BarChart3,
   FileText,
-  Search
 } from 'lucide-react';
 import { toast } from 'sonner';
-import { usePermissions } from '@/context/business-unit-context';
+import { 
+  useCanCreateInCurrentBU,
+  useCanUpdateInCurrentBU,
+  useCanDeleteInCurrentBU
+} from '@/context/business-unit-context';
 import { getProperties, deleteProperty } from '@/lib/actions/property-actions';
 import type { 
   PropertyListItem, 
@@ -72,7 +73,6 @@ export function PropertiesPageClient({
   initialStats,
   initialFilters,
   initialSort,
-  filterOptions,
 }: PropertiesPageClientProps) {
   const router = useRouter();
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
@@ -83,6 +83,7 @@ export function PropertiesPageClient({
   const [data, setData] = useState(initialData);
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const [stats, setStats] = useState(initialStats);
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const [filters, setFilters] = useState<PropertyFilters>(initialFilters);
   const [sort, setSort] = useState<PropertySort>(initialSort);
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
@@ -100,11 +101,15 @@ export function PropertiesPageClient({
   });
   const [isDeleting, setIsDeleting] = useState(false);
 
-  // Permissions
-  const { canManageProperties, hasPermission } = usePermissions();
-  const canEdit = canManageProperties || hasPermission('properties:update');
-  const canDelete = canManageProperties || hasPermission('properties:delete');
-  const canCreate = canManageProperties || hasPermission('properties:create');
+
+  const canCreate = useCanCreateInCurrentBU('properties');
+  const canEdit = useCanUpdateInCurrentBU('properties');
+  const canDelete = useCanDeleteInCurrentBU('properties');
+
+  // Alternative approach if you prefer using hasPermission directly:
+  // const canCreate = hasPermission('properties', 'canCreate');
+  // const canEdit = hasPermission('properties', 'canUpdate');
+  // const canDelete = hasPermission('properties', 'canDelete');
 
   // Update URL with current filters and sort
   const updateURL = useCallback((newFilters: PropertyFilters, newSort: PropertySort, page: number = 1) => {
@@ -147,15 +152,6 @@ export function PropertiesPageClient({
     }
   }, [businessUnitId]);
 
-  // Handle filter changes
-  const handleFiltersChange = useCallback((newFilters: PropertyFilters) => {
-    setFilters(newFilters);
-    startTransition(() => {
-      updateURL(newFilters, sort, 1);
-      fetchProperties(newFilters, sort, 1);
-    });
-  }, [sort, updateURL, fetchProperties]);
-
   // Handle sort changes
   const handleSortChange = useCallback((newSort: PropertySort) => {
     setSort(newSort);
@@ -173,9 +169,9 @@ export function PropertiesPageClient({
     });
   }, [filters, sort, updateURL, fetchProperties]);
 
-const handleViewProperty = useCallback((propertyId: string) => {
-  router.push(`/${businessUnitId}/properties/${propertyId}`);
-}, [businessUnitId, router]);
+  const handleViewProperty = useCallback((propertyId: string) => {
+    router.push(`/${businessUnitId}/properties/${propertyId}`);
+  }, [businessUnitId, router]);
 
   // Handle delete property
   const handleDeleteProperty = useCallback((propertyId: string) => {
@@ -343,53 +339,15 @@ const handleViewProperty = useCallback((propertyId: string) => {
         <PropertyStatsCards stats={stats} />
       </div>
 
-      {/* Search & Filters Section */}
-      <div className="space-y-2">
-        <div className="flex items-center gap-2">
-          <Search className="h-5 w-5 text-green-600" />
-          <h2 className="text-xl font-semibold">Search & Filter Properties</h2>
-        </div>
-        <Card className="border-l-4 border-l-green-500">
-          <CardHeader className="pb-4">
-            <CardTitle className="flex items-center gap-2 text-lg">
-              <Filter className="h-5 w-5 text-green-600" />
-              Property Filters
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <PropertyFiltersComponent
-              filters={filters}
-              onFiltersChange={handleFiltersChange}
-              filterOptions={filterOptions}
-            />
-          </CardContent>
-        </Card>
-      </div>
-
       {/* Properties Data Table */}
       <div className="space-y-2">
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 mb-4">
           <FileText className="h-5 w-5 text-purple-600" />
-          <h2 className="text-xl font-semibold">Property Records</h2>
+          <h2 className="text-xl font-semibold">Property Records ({data.totalCount.toLocaleString()})</h2>
         </div>
-        <Card className="border-l-4 border-l-purple-500">
-          <CardHeader className="pb-4">
-            <div className="flex items-center justify-between">
-              <CardTitle className="flex items-center gap-2 text-lg">
-                <Building2 className="h-5 w-5 text-purple-600" />
-                All Properties ({data.totalCount.toLocaleString()})
-              </CardTitle>
-              <div className="flex items-center gap-4 text-sm text-muted-foreground">
-                <span className="bg-muted px-3 py-1 rounded-full font-medium">
-                  Page {data.currentPage} of {data.totalPages}
-                </span>
-                <span className="bg-blue-50 text-blue-700 px-3 py-1 rounded-full font-medium">
-                  {data.properties.length} records shown
-                </span>
-              </div>
-            </div>
-          </CardHeader>
-          <CardContent className="p-0 mr-4 ml-4">
+        <div>
+
+          <CardContent className="p-0">
             <PropertyTable
               properties={data.properties}
               sort={sort}
@@ -400,7 +358,22 @@ const handleViewProperty = useCallback((propertyId: string) => {
               canDelete={canDelete}
             />
           </CardContent>
-        </Card>
+          <CardFooter className='mt-4'>
+                        <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2 text-lg">
+
+              </div>
+              <div className="flex items-center gap-4 text-sm text-muted-foreground">
+                <span className="bg-muted px-3 py-1 rounded-full font-medium">
+                  Page {data.currentPage} of {data.totalPages}
+                </span>
+                <span className="bg-blue-50 text-blue-700 px-3 py-1 rounded-full font-medium">
+                  {data.properties.length} records shown
+                </span>
+              </div>
+            </div>
+          </CardFooter>
+        </div>
       </div>
 
       {/* Enhanced Pagination */}

@@ -187,7 +187,6 @@ export async function getUserById(
             businessUnitMembers: true,
             createdProperties: true,
             updatedProperties: true,
-            approvals: true,
             releases: true,
             turnovers: true,
             returns: true,

@@ -1,10 +1,10 @@
-// Property Management System - Prisma Schema
+// Property Management System - Enhanced Prisma Schema
 generator client {
   provider = "prisma-client-js"
 }
 
 datasource db {
-  provider = "postgresql" // or "mysql", "sqlite" based on your preference
+  provider = "postgresql"
   url      = env("DATABASE_URL")
 }
 
@@ -48,7 +48,7 @@ model VerificationToken {
   @@map("verificationtokens")
 }
 
-// User and Role Management
+// Enhanced User and Role Management
 model User {
   id            String    @id @default(uuid())
   username      String?   @unique
@@ -62,23 +62,29 @@ model User {
   updatedAt     DateTime  @updatedAt @map("updated_at")
   isActive      Boolean   @default(true) @map("is_active")
 
+  // No direct role assignment - roles come through business unit memberships
+
   // Relations
   accounts            Account[]
   sessions            Session[]
-  businessUnitMembers BusinessUnitMember[]
-  createdProperties   Property[]           @relation("PropertyCreator")
-  updatedProperties   Property[]           @relation("PropertyUpdater")
-  approvals           PropertyApproval[]
-  releases            PropertyRelease[]    @relation("ReleasedBy")
-  approvedReleases    PropertyRelease[]    @relation("ApprovedByRelease")
-  receivedReleases    PropertyRelease[]    @relation("ReceivedByRelease")
-  turnovers           PropertyTurnover[]   @relation("TurnedOverBy")
-  receivedTurnovers   PropertyTurnover[]   @relation("TurnoverReceivedBy")
-  returns             PropertyReturn[]     @relation("ReturnedBy")
-  receivedReturns     PropertyReturn[]     @relation("ReturnReceivedBy")
+  businessUnitMembers BusinessUnitMember[] // This is how users get roles
+  createdProperties   Property[]             @relation("PropertyCreator")
+  updatedProperties   Property[]             @relation("PropertyUpdater")
+  custodianProperties Property[]             @relation("PropertyCustodian")
+  approvalRequests    ApprovalRequest[]      @relation("ApprovalRequestedBy")
+  approvalResponses   ApprovalStepResponse[]
+  releases            PropertyRelease[]      @relation("ReleasedBy")
+  releaseApprovals    PropertyRelease[]      @relation("ReleaseApprovedBy")
+  releaseReceivers    PropertyRelease[]      @relation("ReleaseReceivedBy")
+  turnovers           PropertyTurnover[]     @relation("TurnedOverBy")
+  turnoverReceivers   PropertyTurnover[]     @relation("TurnoverReceivedBy")
+  turnoverApprovals   PropertyTurnover[]     @relation("TurnoverApprovedBy")
+  returns             PropertyReturn[]       @relation("ReturnedBy")
+  returnReceivers     PropertyReturn[]       @relation("ReturnReceivedBy")
+  returnApprovals     PropertyReturn[]       @relation("ReturnApprovedBy")
   auditLogs           AuditLog[]
-  createdDocuments    Document[]           @relation("DocumentCreator")
-  updatedDocuments    Document[]           @relation("DocumentUpdater")
+  createdDocuments    Document[]             @relation("DocumentCreator")
+  updatedDocuments    Document[]             @relation("DocumentUpdater")
 
   @@map("users")
 }
@@ -87,28 +93,56 @@ model Role {
   id          String   @id @default(uuid())
   name        String   @unique
   description String?
-  permissions Json // Store permissions as JSON array
+  level       Int      @default(0) // 0=Staff, 1=Manager, 2=Director, 3=VP, 4=Managing Director
   createdAt   DateTime @default(now()) @map("created_at")
   updatedAt   DateTime @updatedAt @map("updated_at")
 
   businessUnitMembers BusinessUnitMember[]
+  permissions         RolePermissions[]
+  approvalSteps       ApprovalStep[]
 
   @@map("roles")
 }
 
-// Business Unit Management
-model BusinessUnit {
-  id          String   @id @default(uuid())
-  name        String   @unique
-  description String?
-  address     String?
-  isActive    Boolean  @default(true) @map("is_active")
-  createdAt   DateTime @default(now()) @map("created_at")
-  updatedAt   DateTime @updatedAt @map("updated_at")
+// Boolean-based permissions
+model RolePermissions {
+  id         String  @id @default(uuid())
+  roleId     String  @map("role_id")
+  module     String // e.g., "PROPERTY", "RPT", "USER_MANAGEMENT"
+  canCreate  Boolean @default(false) @map("can_create")
+  canRead    Boolean @default(false) @map("can_read")
+  canUpdate  Boolean @default(false) @map("can_update")
+  canDelete  Boolean @default(false) @map("can_delete")
+  canApprove Boolean @default(false) @map("can_approve")
 
   // Relations
-  members    BusinessUnitMember[]
-  properties Property[]
+  role Role @relation(fields: [roleId], references: [id], onDelete: Cascade)
+
+  @@unique([roleId, module])
+  @@map("role_permissions")
+}
+
+// Business Unit Management
+model BusinessUnit {
+  id            String           @id @default(uuid())
+  name          String           @unique
+  description   String?
+  address       String?
+  contactPerson String?          @map("contact_person")
+  contactEmail  String?          @map("contact_email")
+  contactPhone  String?          @map("contact_phone")
+  unitType      BusinessUnitType @map("unit_type")
+  isActive      Boolean          @default(true) @map("is_active")
+  createdAt     DateTime         @default(now()) @map("created_at")
+  updatedAt     DateTime         @updatedAt @map("updated_at")
+
+  // Relations
+  members       BusinessUnitMember[]
+  properties    Property[]
+  releases      PropertyRelease[]
+  turnoversFrom PropertyTurnover[]   @relation("TurnoversFrom")
+  turnoversTo   PropertyTurnover[]   @relation("TurnoversTo")
+  returns       PropertyReturn[]
 
   @@map("business_units")
 }
@@ -131,21 +165,44 @@ model BusinessUnitMember {
   @@map("business_unit_members")
 }
 
-// Property Management
+// Bank Management for Document Custody
+model Bank {
+  id            String   @id @default(uuid())
+  name          String
+  branchName    String   @map("branch_name")
+  address       String?
+  contactPerson String   @map("contact_person")
+  contactEmail  String?  @map("contact_email")
+  contactPhone  String?  @map("contact_phone")
+  isActive      Boolean  @default(true) @map("is_active")
+  createdAt     DateTime @default(now()) @map("created_at")
+  updatedAt     DateTime @updatedAt @map("updated_at")
+
+  // Relations
+  properties Property[]
+  releases   PropertyRelease[]
+
+  @@unique([name, branchName])
+  @@map("banks")
+}
+
+// Enhanced Property Management
 model Property {
   id                     String                 @id @default(uuid())
+  propertyName           String                 @map("property_name")
   titleNumber            String                 @unique @map("title_number")
   lotNumber              String                 @map("lot_number")
   location               String
-  area                   Decimal                @db.Decimal(10, 2) // Area in square meters
+  area                   Decimal                @db.Decimal(10, 2)
   description            String?                @db.Text
   registeredOwner        String                 @map("registered_owner")
   encumbranceMortgage    String?                @map("encumbrance_mortgage") @db.Text
   borrowerMortgagor      String?                @map("borrower_mortgagor")
-  bank                   String?
-  custodyOriginalTitle   String?                @map("custody_original_title")
+  bankId                 String?                @map("bank_id") // Current bank custody
+  custodianId            String                 @map("custodian_id") // Current custodian
   propertyClassification PropertyClassification @map("property_classification")
   status                 PropertyStatus
+  currentLocation        PropertyLocation       @map("current_location")
   taxDeclaration         String?                @map("tax_declaration")
   remarks                String?                @db.Text
   businessUnitId         String                 @map("business_unit_id")
@@ -155,18 +212,215 @@ model Property {
   updatedAt              DateTime               @updatedAt @map("updated_at")
 
   // Relations
-  businessUnit BusinessUnit       @relation(fields: [businessUnitId], references: [id])
-  createdBy    User               @relation("PropertyCreator", fields: [createdById], references: [id])
-  updatedBy    User?              @relation("PropertyUpdater", fields: [updatedById], references: [id])
-  approvals    PropertyApproval[]
-  releases     PropertyRelease[]
-  turnovers    PropertyTurnover[]
-  returns      PropertyReturn[]
-  auditLogs    AuditLog[]
-  rptRecords   RealPropertyTax[]
-  documents    Document[]
+  businessUnit     BusinessUnit       @relation(fields: [businessUnitId], references: [id])
+  createdBy        User               @relation("PropertyCreator", fields: [createdById], references: [id])
+  updatedBy        User?              @relation("PropertyUpdater", fields: [updatedById], references: [id])
+  custodian        User               @relation("PropertyCustodian", fields: [custodianId], references: [id])
+  bank             Bank?              @relation(fields: [bankId], references: [id])
+  releases         PropertyRelease[]
+  turnovers        PropertyTurnover[]
+  returns          PropertyReturn[]
+  movements        PropertyMovement[]
+  auditLogs        AuditLog[]
+  rptRecords       RealPropertyTax[]
+  documents        Document[]
+  approvalRequests ApprovalRequest[]
 
   @@map("properties")
+}
+
+// Property Movement Tracking
+model PropertyMovement {
+  id                 String           @id @default(uuid())
+  propertyId         String           @map("property_id")
+  movementType       MovementType     @map("movement_type")
+  fromLocation       PropertyLocation @map("from_location")
+  toLocation         PropertyLocation @map("to_location")
+  fromCustodian      String?          @map("from_custodian")
+  toCustodian        String?          @map("to_custodian")
+  bankId             String?          @map("bank_id")
+  businessUnitId     String?          @map("business_unit_id")
+  referenceId        String?          @map("reference_id") // Links to release/return/turnover
+  referenceType      String?          @map("reference_type") // "RELEASE", "RETURN", "TURNOVER"
+  movementDate       DateTime         @map("movement_date")
+  expectedReturnDate DateTime?        @map("expected_return_date")
+  notes              String?          @db.Text
+  createdAt          DateTime         @default(now()) @map("created_at")
+
+  // Relations
+  property Property @relation(fields: [propertyId], references: [id], onDelete: Cascade)
+
+  @@map("property_movements")
+}
+
+// Enhanced Approval System
+model ApprovalWorkflow {
+  id          String   @id @default(uuid())
+  name        String   @unique // "Property Release", "Property Return", "Property Turnover"
+  description String?
+  entityType  String // "PROPERTY_RELEASE", "PROPERTY_RETURN", "PROPERTY_TURNOVER"
+  isActive    Boolean  @default(true) @map("is_active")
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  steps    ApprovalStep[]
+  requests ApprovalRequest[]
+
+  @@map("approval_workflows")
+}
+
+model ApprovalStep {
+  id               String  @id @default(uuid())
+  workflowId       String  @map("workflow_id")
+  stepOrder        Int     @map("step_order")
+  stepName         String  @map("step_name") // "Manager Approval", "Director Approval"
+  roleId           String  @map("role_id")
+  isRequired       Boolean @default(true) @map("is_required")
+  canOverride      Boolean @default(false) @map("can_override") // VP/MD can override
+  overrideMinLevel Int?    @map("override_min_level") // Minimum role level to override
+
+  workflow  ApprovalWorkflow       @relation(fields: [workflowId], references: [id], onDelete: Cascade)
+  role      Role                   @relation(fields: [roleId], references: [id])
+  responses ApprovalStepResponse[]
+
+  @@unique([workflowId, stepOrder])
+  @@map("approval_steps")
+}
+
+model ApprovalRequest {
+  id               String                @id @default(uuid())
+  workflowId       String                @map("workflow_id")
+  entityType       String                @map("entity_type") // "PROPERTY_RELEASE", etc.
+  entityId         String                @map("entity_id") // ID of release/return/turnover
+  propertyId       String                @map("property_id")
+  requestedById    String                @map("requested_by_id")
+  currentStepOrder Int                   @default(1) @map("current_step_order")
+  status           ApprovalRequestStatus
+  isOverridden     Boolean               @default(false) @map("is_override")
+  overriddenById   String?               @map("overridden_by_id")
+  overriddenAt     DateTime?             @map("overridden_at")
+  overrideReason   String?               @map("override_reason") @db.Text
+  completedAt      DateTime?             @map("completed_at")
+  createdAt        DateTime              @default(now()) @map("created_at")
+  updatedAt        DateTime              @updatedAt @map("updated_at")
+
+  workflow    ApprovalWorkflow       @relation(fields: [workflowId], references: [id])
+  property    Property               @relation(fields: [propertyId], references: [id])
+  requestedBy User                   @relation("ApprovalRequestedBy", fields: [requestedById], references: [id])
+  responses   ApprovalStepResponse[]
+
+  @@map("approval_requests")
+}
+
+model ApprovalStepResponse {
+  id                String         @id @default(uuid())
+  approvalRequestId String         @map("approval_request_id")
+  stepId            String         @map("step_id")
+  respondedById     String         @map("responded_by_id")
+  status            ApprovalStatus
+  comments          String?        @db.Text
+  respondedAt       DateTime       @default(now()) @map("responded_at")
+  isOverride        Boolean        @default(false) @map("is_override")
+
+  approvalRequest ApprovalRequest @relation(fields: [approvalRequestId], references: [id], onDelete: Cascade)
+  step            ApprovalStep    @relation(fields: [stepId], references: [id])
+  respondedBy     User            @relation(fields: [respondedById], references: [id])
+
+  @@unique([approvalRequestId, stepId])
+  @@map("approval_step_responses")
+}
+
+// Property Release Management
+model PropertyRelease {
+  id                 String            @id @default(uuid())
+  propertyId         String            @map("property_id")
+  releaseType        ReleaseType       @map("release_type")
+  businessUnitId     String?           @map("business_unit_id") // For subsidiary releases
+  bankId             String?           @map("bank_id") // For bank releases
+  dateReleased       DateTime?         @map("date_released")
+  expectedReturnDate DateTime?         @map("expected_return_date")
+  releasedById       String?           @map("released_by_id")
+  purposeOfRelease   String            @map("purpose_of_release") @db.Text
+  approvedById       String?           @map("approved_by_id")
+  receivedById       String?           @map("received_by_id")
+  receivedByName     String?           @map("received_by_name") // External person name
+  transmittalNumber  String?           @map("transmittal_number")
+  status             TransactionStatus @default(PENDING)
+  approvalRequestId  String?           @map("approval_request_id")
+  notes              String?           @db.Text
+  createdAt          DateTime          @default(now()) @map("created_at")
+  updatedAt          DateTime          @updatedAt @map("updated_at")
+
+  // Relations
+  property     Property      @relation(fields: [propertyId], references: [id], onDelete: Cascade)
+  businessUnit BusinessUnit? @relation(fields: [businessUnitId], references: [id])
+  bank         Bank?         @relation(fields: [bankId], references: [id])
+  releasedBy   User?         @relation("ReleasedBy", fields: [releasedById], references: [id])
+  approvedBy   User?         @relation("ReleaseApprovedBy", fields: [approvedById], references: [id])
+  receivedBy   User?         @relation("ReleaseReceivedBy", fields: [receivedById], references: [id])
+  documents    Document[]
+
+  @@map("property_releases")
+}
+
+// Property Turnover Management
+model PropertyTurnover {
+  id                 String            @id @default(uuid())
+  propertyId         String            @map("property_id")
+  turnoverType       TurnoverType      @map("turnover_type")
+  fromBusinessUnitId String?           @map("from_business_unit_id")
+  toBusinessUnitId   String?           @map("to_business_unit_id")
+  turnedOverDate     DateTime?         @map("turned_over_date")
+  turnedOverById     String?           @map("turned_over_by_id")
+  receivedById       String?           @map("received_by_id")
+  approvedById       String?           @map("approved_by_id")
+  purpose            String?           @db.Text
+  status             TransactionStatus @default(PENDING)
+  approvalRequestId  String?           @map("approval_request_id")
+  notes              String?           @db.Text
+  createdAt          DateTime          @default(now()) @map("created_at")
+  updatedAt          DateTime          @updatedAt @map("updated_at")
+
+  // Relations
+  property         Property      @relation(fields: [propertyId], references: [id], onDelete: Cascade)
+  fromBusinessUnit BusinessUnit? @relation("TurnoversFrom", fields: [fromBusinessUnitId], references: [id])
+  toBusinessUnit   BusinessUnit? @relation("TurnoversTo", fields: [toBusinessUnitId], references: [id])
+  turnedOverBy     User?         @relation("TurnedOverBy", fields: [turnedOverById], references: [id])
+  receivedBy       User?         @relation("TurnoverReceivedBy", fields: [receivedById], references: [id])
+  approvedBy       User?         @relation("TurnoverApprovedBy", fields: [approvedById], references: [id])
+  documents        Document[]
+
+  @@map("property_turnovers")
+}
+
+// Property Return Management
+model PropertyReturn {
+  id                String            @id @default(uuid())
+  propertyId        String            @map("property_id")
+  returnType        ReturnType        @map("return_type")
+  businessUnitId    String?           @map("business_unit_id") // From which unit
+  dateReturned      DateTime?         @map("date_returned")
+  returnedById      String?           @map("returned_by_id")
+  receivedById      String?           @map("received_by_id")
+  approvedById      String?           @map("approved_by_id")
+  returnedByName    String?           @map("returned_by_name") // External person name
+  reasonForReturn   String?           @map("reason_for_return") @db.Text
+  condition         String? // Condition of documents upon return
+  status            TransactionStatus @default(PENDING)
+  approvalRequestId String?           @map("approval_request_id")
+  notes             String?           @db.Text
+  createdAt         DateTime          @default(now()) @map("created_at")
+  updatedAt         DateTime          @updatedAt @map("updated_at")
+
+  // Relations
+  property     Property      @relation(fields: [propertyId], references: [id], onDelete: Cascade)
+  businessUnit BusinessUnit? @relation(fields: [businessUnitId], references: [id])
+  returnedBy   User?         @relation("ReturnedBy", fields: [returnedById], references: [id])
+  receivedBy   User?         @relation("ReturnReceivedBy", fields: [receivedById], references: [id])
+  approvedBy   User?         @relation("ReturnApprovedBy", fields: [approvedById], references: [id])
+  documents    Document[]
+
+  @@map("property_returns")
 }
 
 // Real Property Tax Management
@@ -175,7 +429,7 @@ model RealPropertyTax {
   propertyId           String              @map("property_id")
   taxYear              Int                 @map("tax_year")
   assessedValue        Decimal             @map("assessed_value") @db.Decimal(15, 2)
-  taxRate              Decimal             @map("tax_rate") @db.Decimal(5, 4) // Percentage as decimal (e.g., 0.02 for 2%)
+  taxRate              Decimal             @map("tax_rate") @db.Decimal(5, 4)
   basicTax             Decimal             @map("basic_tax") @db.Decimal(15, 2)
   specialEducationFund Decimal?            @map("special_education_fund") @db.Decimal(15, 2)
   penalty              Decimal?            @default(0) @db.Decimal(15, 2)
@@ -189,21 +443,21 @@ model RealPropertyTax {
   updatedAt            DateTime            @updatedAt @map("updated_at")
 
   // Relations
-  property  Property     @relation(fields: [propertyId], references: [id], onDelete: Cascade)
+  property  Property      @relation(fields: [propertyId], references: [id], onDelete: Cascade)
   payments  RPTPayment[]
   documents Document[]
+  reminders RPTReminder[]
 
   @@unique([propertyId, taxYear, paymentSchedule])
   @@map("real_property_taxes")
 }
 
-// RPT Payment Records
 model RPTPayment {
   id              String   @id @default(uuid())
   rptId           String   @map("rpt_id")
   paymentDate     DateTime @map("payment_date")
   amountPaid      Decimal  @map("amount_paid") @db.Decimal(15, 2)
-  paymentMethod   String   @map("payment_method") // CASH, CHECK, ONLINE, BANK_TRANSFER, etc.
+  paymentMethod   String   @map("payment_method")
   referenceNumber String?  @map("reference_number")
   receiptNumber   String?  @map("receipt_number")
   remarks         String?  @db.Text
@@ -216,21 +470,38 @@ model RPTPayment {
   @@map("rpt_payments")
 }
 
+model RPTReminder {
+  id           String       @id @default(uuid())
+  rptId        String       @map("rpt_id")
+  reminderDate DateTime     @map("reminder_date")
+  reminderType ReminderType @map("reminder_type")
+  isSent       Boolean      @default(false) @map("is_sent")
+  sentAt       DateTime?    @map("sent_at")
+  createdAt    DateTime     @default(now()) @map("created_at")
+
+  realPropertyTax RealPropertyTax @relation(fields: [rptId], references: [id], onDelete: Cascade)
+
+  @@map("rpt_reminders")
+}
+
 // Document Management
 model Document {
   id           String       @id @default(uuid())
   fileName     String       @map("file_name")
   originalName String       @map("original_name")
-  fileSize     Int          @map("file_size") // Size in bytes
+  fileSize     Int          @map("file_size")
   mimeType     String       @map("mime_type")
-  filePath     String       @map("file_path") // Storage path or URL
+  filePath     String       @map("file_path")
   documentType DocumentType @map("document_type")
   description  String?      @db.Text
 
-  // Polymorphic relations - only one should be set
-  propertyId   String? @map("property_id")
-  rptId        String? @map("rpt_id")
-  rptPaymentId String? @map("rpt_payment_id")
+  // Polymorphic relations
+  propertyId         String? @map("property_id")
+  rptId              String? @map("rpt_id")
+  rptPaymentId       String? @map("rpt_payment_id")
+  propertyReleaseId  String? @map("property_release_id")
+  propertyTurnoverId String? @map("property_turnover_id")
+  propertyReturnId   String? @map("property_return_id")
 
   isActive    Boolean  @default(true) @map("is_active")
   createdById String   @map("created_by_id")
@@ -239,97 +510,25 @@ model Document {
   updatedAt   DateTime @updatedAt @map("updated_at")
 
   // Relations
-  property        Property?        @relation(fields: [propertyId], references: [id], onDelete: Cascade)
-  realPropertyTax RealPropertyTax? @relation(fields: [rptId], references: [id], onDelete: Cascade)
-  rptPayment      RPTPayment?      @relation(fields: [rptPaymentId], references: [id], onDelete: Cascade)
-  createdBy       User             @relation("DocumentCreator", fields: [createdById], references: [id])
-  updatedBy       User?            @relation("DocumentUpdater", fields: [updatedById], references: [id])
+  property         Property?         @relation(fields: [propertyId], references: [id], onDelete: Cascade)
+  realPropertyTax  RealPropertyTax?  @relation(fields: [rptId], references: [id], onDelete: Cascade)
+  rptPayment       RPTPayment?       @relation(fields: [rptPaymentId], references: [id], onDelete: Cascade)
+  propertyRelease  PropertyRelease?  @relation(fields: [propertyReleaseId], references: [id], onDelete: Cascade)
+  propertyTurnover PropertyTurnover? @relation(fields: [propertyTurnoverId], references: [id], onDelete: Cascade)
+  propertyReturn   PropertyReturn?   @relation(fields: [propertyReturnId], references: [id], onDelete: Cascade)
+  createdBy        User              @relation("DocumentCreator", fields: [createdById], references: [id])
+  updatedBy        User?             @relation("DocumentUpdater", fields: [updatedById], references: [id])
 
   @@map("documents")
-}
-
-// Property Approval System
-model PropertyApproval {
-  id         String         @id @default(uuid())
-  propertyId String         @map("property_id")
-  approvedBy String         @map("approved_by")
-  status     ApprovalStatus
-  comments   String?        @db.Text
-  approvedAt DateTime?      @map("approved_at")
-  createdAt  DateTime       @default(now()) @map("created_at")
-
-  // Relations
-  property Property @relation(fields: [propertyId], references: [id], onDelete: Cascade)
-  approver User     @relation(fields: [approvedBy], references: [id])
-
-  @@map("property_approvals")
-}
-
-// Property Release Management
-model PropertyRelease {
-  id                String    @id @default(uuid())
-  propertyId        String    @map("property_id")
-  dateReleased      DateTime? @map("date_released")
-  releasedById      String?   @map("released_by_id")
-  purposeOfRelease  String?   @map("purpose_of_release") @db.Text
-  approvedById      String?   @map("approved_by_id")
-  receivedById      String?   @map("received_by_id")
-  transmittalNumber String?   @map("transmittal_number")
-  createdAt         DateTime  @default(now()) @map("created_at")
-  updatedAt         DateTime  @updatedAt @map("updated_at")
-
-  // Relations
-  property   Property @relation(fields: [propertyId], references: [id], onDelete: Cascade)
-  releasedBy User?    @relation("ReleasedBy", fields: [releasedById], references: [id])
-  approvedBy User?    @relation("ApprovedByRelease", fields: [approvedById], references: [id])
-  receivedBy User?    @relation("ReceivedByRelease", fields: [receivedById], references: [id])
-
-  @@map("property_releases")
-}
-
-// Property Turnover Management
-model PropertyTurnover {
-  id             String    @id @default(uuid())
-  propertyId     String    @map("property_id")
-  turnedOverDate DateTime? @map("turned_over_date")
-  turnedOverById String?   @map("turned_over_by_id")
-  receivedById   String?   @map("received_by_id")
-  createdAt      DateTime  @default(now()) @map("created_at")
-  updatedAt      DateTime  @updatedAt @map("updated_at")
-
-  // Relations
-  property     Property @relation(fields: [propertyId], references: [id], onDelete: Cascade)
-  turnedOverBy User?    @relation("TurnedOverBy", fields: [turnedOverById], references: [id])
-  receivedBy   User?    @relation("TurnoverReceivedBy", fields: [receivedById], references: [id])
-
-  @@map("property_turnovers")
-}
-
-// Property Return Management
-model PropertyReturn {
-  id           String    @id @default(uuid())
-  propertyId   String    @map("property_id")
-  dateReturned DateTime? @map("date_returned")
-  returnedById String?   @map("returned_by_id")
-  receivedById String?   @map("received_by_id")
-  createdAt    DateTime  @default(now()) @map("created_at")
-  updatedAt    DateTime  @updatedAt @map("updated_at")
-
-  // Relations
-  property   Property @relation(fields: [propertyId], references: [id], onDelete: Cascade)
-  returnedBy User?    @relation("ReturnedBy", fields: [returnedById], references: [id])
-  receivedBy User?    @relation("ReturnReceivedBy", fields: [receivedById], references: [id])
-
-  @@map("property_returns")
 }
 
 // Audit Trail
 model AuditLog {
   id         String   @id @default(uuid())
-  action     String // CREATE, UPDATE, DELETE, APPROVE, RELEASE, etc.
-  entity     String // Property, User, BusinessUnit, etc.
+  action     String
+  entity     String
   entityId   String   @map("entity_id")
-  propertyId String?  @map("property_id") // Optional relation to property
+  propertyId String?  @map("property_id")
   userId     String   @map("user_id")
   oldValues  Json?    @map("old_values")
   newValues  Json?    @map("new_values")
@@ -343,6 +542,15 @@ model AuditLog {
 }
 
 // Enums
+enum BusinessUnitType {
+  MAIN_OFFICE
+  SUBSIDIARY
+  BRANCH
+  EXTERNAL_ORGANIZATION
+
+  @@map("business_unit_type")
+}
+
 enum PropertyClassification {
   RESIDENTIAL
   COMMERCIAL
@@ -364,19 +572,78 @@ enum PropertyStatus {
   RETURNED
   UNDER_REVIEW
   DISPUTED
+  BANK_CUSTODY
 
   @@map("property_status")
 }
 
-enum ApprovalWorkflowStatus {
+enum PropertyLocation {
+  MAIN_OFFICE
+  SUBSIDIARY_COMPANY
+  BANK_CUSTODY
+  EXTERNAL_HOLDER
+  IN_TRANSIT
+
+  @@map("property_location")
+}
+
+enum MovementType {
+  RELEASE_TO_SUBSIDIARY
+  RELEASE_TO_BANK
+  RETURN_FROM_SUBSIDIARY
+  RETURN_FROM_BANK
+  TURNOVER_INTERNAL
+  CUSTODY_CHANGE
+
+  @@map("movement_type")
+}
+
+enum ReleaseType {
+  TO_SUBSIDIARY
+  TO_BANK
+  TO_EXTERNAL
+
+  @@map("release_type")
+}
+
+enum TurnoverType {
+  INTERNAL_DEPARTMENT
+  BETWEEN_SUBSIDIARIES
+  CUSTODY_TRANSFER
+
+  @@map("turnover_type")
+}
+
+enum ReturnType {
+  FROM_SUBSIDIARY
+  FROM_BANK
+  FROM_EXTERNAL
+
+  @@map("return_type")
+}
+
+enum TransactionStatus {
+  PENDING
+  APPROVED
+  REJECTED
+  IN_PROGRESS
+  COMPLETED
+  CANCELLED
+  OVERRIDDEN
+
+  @@map("transaction_status")
+}
+
+enum ApprovalRequestStatus {
   PENDING
   IN_PROGRESS
   APPROVED
   REJECTED
   CANCELLED
+  OVERRIDDEN
   EXPIRED
 
-  @@map("approval_workflow_status")
+  @@map("approval_request_status")
 }
 
 enum ApprovalStatus {
@@ -391,13 +658,13 @@ enum ApprovalStatus {
 }
 
 enum PaymentScheduleType {
-  QUARTERLY_Q1 // First Quarter
-  QUARTERLY_Q2 // Second Quarter
-  QUARTERLY_Q3 // Third Quarter
-  QUARTERLY_Q4 // Fourth Quarter
-  ANNUAL // Full Year
-  SEMI_ANNUAL_H1 // First Half
-  SEMI_ANNUAL_H2 // Second Half
+  QUARTERLY_Q1
+  QUARTERLY_Q2
+  QUARTERLY_Q3
+  QUARTERLY_Q4
+  ANNUAL
+  SEMI_ANNUAL_H1
+  SEMI_ANNUAL_H2
 
   @@map("payment_schedule_type")
 }
@@ -411,6 +678,15 @@ enum RPTStatus {
   WAIVED
 
   @@map("rpt_status")
+}
+
+enum ReminderType {
+  DUE_SOON
+  OVERDUE
+  PENALTY_APPLIED
+  PAYMENT_REQUIRED
+
+  @@map("reminder_type")
 }
 
 enum DocumentType {
@@ -428,6 +704,12 @@ enum DocumentType {
   PAYMENT_RECEIPT
   TAX_CLEARANCE
   ASSESSMENT_NOTICE
+
+  // Transaction Documents
+  RELEASE_FORM
+  TURNOVER_RECEIPT
+  RETURN_RECEIPT
+  APPROVAL_DOCUMENT
 
   // General Documents
   CORRESPONDENCE

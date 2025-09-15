@@ -30,7 +30,7 @@ import {
 } from "lucide-react"
 
 import type { BusinessUnitItem } from "@/types/business-unit-types"
-import type { UserAssignment } from "@/next-auth"
+import type { UserAssignment, RolePermission } from "@/next-auth"
 import { Button } from "@/components/ui/button"
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible"
 import { ScrollArea } from "@/components/ui/scroll-area"
@@ -39,7 +39,43 @@ import { Badge } from "@/components/ui/badge"
 import { Sheet, SheetContent, SheetTrigger, SheetHeader, SheetTitle } from "@/components/ui/sheet"
 import BusinessUnitSwitcher from "./business-unit-swticher"
 import UserProfileLogout from "./user-profile-logout"
-import { usePermissions } from "@/context/business-unit-context"
+
+// Updated permission hook to work with RolePermissions model
+const usePermissions = (assignments: UserAssignment[]) => {
+  const isAdmin = useMemo(() => {
+    return assignments.some(assignment =>
+      assignment.role.name === "System Administrator"
+    );
+  }, [assignments]);
+
+  const hasPermission = useMemo(() => {
+    return (module: string, permission: keyof Pick<RolePermission, 'canCreate' | 'canRead' | 'canUpdate' | 'canDelete' | 'canApprove'>) => {
+      if (isAdmin) return true;
+      
+      return assignments.some(assignment =>
+        assignment.role.permissions.some(perm =>
+          perm.module === module && perm[permission] === true
+        )
+      );
+    };
+  }, [assignments, isAdmin]);
+
+  const hasRole = useMemo(() => {
+    return (roleName: string) => {
+      if (isAdmin) return true;
+      return assignments.some(assignment => assignment.role.name === roleName);
+    };
+  }, [assignments, isAdmin]);
+
+  const hasAnyRole = useMemo(() => {
+    return (roleNames: string[]) => {
+      if (isAdmin) return true;
+      return assignments.some(assignment => roleNames.includes(assignment.role.name));
+    };
+  }, [assignments, isAdmin]);
+  
+  return { isAdmin, hasPermission, hasRole, hasAnyRole };
+};
 
 // Navigation structure for Property Management System
 export interface NavItem {
@@ -47,7 +83,8 @@ export interface NavItem {
   href?: string
   icon: React.ComponentType<{ size?: number; className?: string }>
   children?: NavItem[]
-  permission?: string
+  module?: string
+  permission?: keyof Pick<RolePermission, 'canCreate' | 'canRead' | 'canUpdate' | 'canDelete' | 'canApprove'>
   roles?: string[]
   badge?: string
 }
@@ -61,88 +98,102 @@ const navigation: NavItem[] = [
   {
     title: "Properties",
     icon: Home,
-    permission: "properties:read",
+    module: "PROPERTY",
+    permission: "canRead",
     children: [
       { 
         title: "All Properties", 
         href: "/properties", 
         icon: Home,
-        permission: "properties:read",
+        module: "PROPERTY",
+        permission: "canRead",
       },
       { 
         title: "Add Property", 
         href: "/properties/create", 
         icon: Plus,
-        permission: "properties:create",
+        module: "PROPERTY",
+        permission: "canCreate",
       },
       { 
         title: "Property Search", 
         href: "/properties/search", 
         icon: Search,
-        permission: "properties:read",
+        module: "PROPERTY",
+        permission: "canRead",
       },
     ],
   },
   {
     title: "Property Workflow",
     icon: ArrowLeftRight,
-    permission: "properties:read",
+    module: "PROPERTY",
+    permission: "canRead",
     children: [
       { 
-        title: "Approvals", 
+        title: "For Approval", 
         href: "/approvals", 
         icon: CheckCircle,
-        permission: "properties:approve",
-        badge: "pending"
+        module: "PROPERTY",
+        permission: "canApprove",
+        badge: "Pending"
       },
       { 
         title: "Releases", 
         href: "/releases", 
         icon: Send,
-        permission: "properties:release",
+        module: "PROPERTY",
+        permission: "canUpdate",
       },
       { 
         title: "Turnovers", 
         href: "/turnovers", 
         icon: ArrowLeftRight,
-        permission: "properties:turnover",
+        module: "PROPERTY",
+        permission: "canUpdate",
       },
       { 
         title: "Returns", 
         href: "/returns", 
         icon: RotateCcw,
-        permission: "properties:return",
+        module: "PROPERTY",
+        permission: "canUpdate",
       },
     ],
   },
   {
     title: "Reports & Analytics",
     icon: BarChart3,
-    permission: "reports:view_all",
+    module: "REPORTS",
+    permission: "canRead",
     children: [
       { 
         title: "Property Reports", 
         href: "/reports/properties", 
         icon: BarChart3,
-        permission: "reports:view_all",
+        module: "REPORTS",
+        permission: "canRead",
       },
       { 
         title: "Workflow Reports", 
         href: "/reports/workflow", 
         icon: Activity,
-        permission: "reports:view_all",
+        module: "REPORTS",
+        permission: "canRead",
       },
       { 
         title: "User Activity", 
         href: "/reports/users", 
         icon: Users,
-        permission: "reports:view_all",
+        module: "REPORTS",
+        permission: "canRead",
       },
       { 
         title: "Export Data", 
         href: "/reports/export", 
         icon: Download,
-        permission: "reports:export",
+        module: "REPORTS",
+        permission: "canCreate",
       },
     ],
   },
@@ -152,50 +203,58 @@ const managementNavigation: NavItem[] = [
   {
     title: "User Management",
     icon: Users,
-    permission: "users:read",
+    module: "USER_MANAGEMENT",
+    permission: "canRead",
     children: [
       { 
         title: "All Users", 
         href: "/users", 
         icon: Users,
-        permission: "users:read",
+        module: "USER_MANAGEMENT",
+        permission: "canRead",
       },
       { 
         title: "Add User", 
         href: "/users/create", 
         icon: UserPlus,
-        permission: "users:create",
+        module: "USER_MANAGEMENT",
+        permission: "canCreate",
       },
       { 
         title: "User Assignments", 
         href: "/users/assignments", 
         icon: ClipboardList,
-        permission: "users:manage_roles",
+        module: "USER_MANAGEMENT",
+        permission: "canUpdate",
       },
     ],
   },
   {
     title: "Business Units",
     icon: Building2,
-    permission: "business_units:read",
+    module: "BUSINESS_UNITS",
+    permission: "canRead",
     children: [
       { 
         title: "All Units", 
         href: "/business-units", 
         icon: FolderOpen,
-        permission: "business_units:read",
+        module: "BUSINESS_UNITS",
+        permission: "canRead",
       },
       { 
         title: "Add Unit", 
         href: "/business-units/create", 
         icon: Plus,
-        permission: "business_units:create",
+        module: "BUSINESS_UNITS",
+        permission: "canCreate",
       },
       { 
         title: "Unit Members", 
         href: "/business-units/members", 
         icon: Users,
-        permission: "business_units:manage_members",
+        module: "BUSINESS_UNITS",
+        permission: "canUpdate",
       },
     ],
   },
@@ -203,16 +262,20 @@ const managementNavigation: NavItem[] = [
     title: "Roles & Permissions",
     icon: Shield,
     roles: ["System Administrator"],
+    module: "ROLES",
+    permission: "canRead",
     children: [
       { 
         title: "All Roles", 
         href: "/roles", 
+        module: "ROLES", 
         icon: Shield,
         roles: ["System Administrator"],
       },
       { 
         title: "Create Role", 
-        href: "/roles/create", 
+        href: "/roles/create",
+        module: "ROLES", 
         icon: Plus,
         roles: ["System Administrator"],
       },
@@ -221,6 +284,7 @@ const managementNavigation: NavItem[] = [
         href: "/roles/assignments", 
         icon: UserCheck,
         roles: ["System Administrator"],
+        module: "ROLES", 
       },
     ],
   },
@@ -231,18 +295,22 @@ const systemNavigation: NavItem[] = [
     title: "System",
     icon: Settings,
     roles: ["System Administrator"],
+    module: "SYSTEM",
+    permission: "canRead",
     children: [
       { 
         title: "Audit Logs", 
         href: "/audit", 
         icon: Activity,
-        permission: "audit_logs:view",
+        module: "AUDIT",
+        permission: "canRead",
       },
       { 
         title: "System Settings", 
         href: "/settings", 
         icon: Settings,
-        permission: "system:manage",
+        module: "SYSTEM",
+        permission: "canUpdate",
       },
     ],
   },
@@ -264,7 +332,7 @@ interface SidebarLinkProps {
   item: NavItem
   businessUnitId: string
   depth?: number
-  hasPermission: (permission: string) => boolean
+  hasPermission: (module: string, permission: keyof Pick<RolePermission, 'canCreate' | 'canRead' | 'canUpdate' | 'canDelete' | 'canApprove'>) => boolean
   hasRole: (roleName: string) => boolean
   hasAnyRole: (roleNames: string[]) => boolean
   isAdmin: boolean
@@ -363,16 +431,16 @@ function SidebarLink({
     if (isAdmin) return true
     
     // If no permission or role requirement, allow access
-    if (!item.permission && !item.roles) return true
+    if (!item.module && !item.permission && !item.roles) return true
     
-    // Check specific permission
-    if (item.permission && hasPermission(item.permission)) return true
+    // Check specific permission for module
+    if (item.module && item.permission && hasPermission(item.module, item.permission)) return true
     
     // Check specific roles
     if (item.roles && hasAnyRole(item.roles)) return true
     
     return false
-  }, [item.permission, item.roles, hasPermission, hasAnyRole, isAdmin])
+  }, [item.module, item.permission, item.roles, hasPermission, hasAnyRole, isAdmin])
 
   // Always call useState - no conditional calls
   const [open, setOpen] = useState(() => {
@@ -399,8 +467,8 @@ function SidebarLink({
     // Filter children based on permissions
     const visibleChildren = item.children.filter(child => {
       if (isAdmin) return true
-      if (!child.permission && !child.roles) return true
-      if (child.permission && hasPermission(child.permission)) return true
+      if (!child.module && !child.permission && !child.roles) return true
+      if (child.module && child.permission && hasPermission(child.module, child.permission)) return true
       if (child.roles && hasAnyRole(child.roles)) return true
       return false
     })
@@ -528,7 +596,7 @@ function SidebarLink({
                 animate={{ scale: 1 }}
                 className="ml-auto"
               >
-                <Badge variant="secondary" className="text-xs">
+                <Badge variant="default" className="text-xs">
                   {item.badge}
                 </Badge>
               </motion.div>
@@ -554,7 +622,7 @@ function NavigationSection({
   title: string
   items: NavItem[]
   businessUnitId: string
-  hasPermission: (permission: string) => boolean
+  hasPermission: (module: string, permission: keyof Pick<RolePermission, 'canCreate' | 'canRead' | 'canUpdate' | 'canDelete' | 'canApprove'>) => boolean
   hasRole: (roleName: string) => boolean
   hasAnyRole: (roleNames: string[]) => boolean
   isAdmin: boolean
@@ -564,8 +632,8 @@ function NavigationSection({
   const visibleItems = useMemo(() => {
     return items.filter(item => {
       if (isAdmin) return true
-      if (!item.permission && !item.roles) return true
-      if (item.permission && hasPermission(item.permission)) return true
+      if (!item.module && !item.permission && !item.roles) return true
+      if (item.module && item.permission && hasPermission(item.module, item.permission)) return true
       if (item.roles && hasAnyRole(item.roles)) return true
       return false
     })
@@ -603,23 +671,21 @@ function NavigationSection({
 }
 
 // Mobile Sidebar Component
-// eslint-disable-next-line @typescript-eslint/no-unused-vars
 export function MobileSidebar({ businessUnitId, businessUnits, currentUser }: SidebarProps) {
-  const [open, setOpen] = useState(false)
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  const { isAdmin, userRole, hasPermission, hasRole, hasAnyRole } = usePermissions()
+  const { isAdmin, hasPermission, hasRole, hasAnyRole } = usePermissions(currentUser.assignments);
 
   // Determine if user should see management sections
   const canViewManagement = isAdmin || hasAnyRole([
-    'Property Manager', 
-    'Property Supervisor', 
-    'Finance Manager', 
-    'Legal Officer'
-  ]) || hasPermission('users:read') || hasPermission('business_units:read')
+    'Custodian', 
+    'Manager', 
+    'Approver', 
+    'System Admin'
+  ]) || hasPermission('USER_MANAGEMENT', 'canRead') || hasPermission('BUSINESS_UNITS', 'canRead')
 
   const handleNavigate = () => {
     setOpen(false)
   }
+  const [open, setOpen] = useState(false)
 
   return (
     <Sheet open={open} onOpenChange={setOpen}>
@@ -714,8 +780,7 @@ export function MobileSidebar({ businessUnitId, businessUnits, currentUser }: Si
 
 // Desktop Sidebar Component
 export function Sidebar({ businessUnitId, businessUnits, currentUser }: SidebarProps) {
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  const { isAdmin, userRole, hasPermission, hasRole, hasAnyRole } = usePermissions()
+  const { isAdmin, hasPermission, hasRole, hasAnyRole } = usePermissions(currentUser.assignments);
 
   // Determine if user should see management sections
   const canViewManagement = isAdmin || hasAnyRole([
@@ -723,7 +788,7 @@ export function Sidebar({ businessUnitId, businessUnits, currentUser }: SidebarP
     'Property Supervisor', 
     'Finance Manager', 
     'Legal Officer'
-  ]) || hasPermission('users:read') || hasPermission('business_units:read')
+  ]) || hasPermission('USER_MANAGEMENT', 'canRead') || hasPermission('BUSINESS_UNITS', 'canRead')
 
   return (
     <>

@@ -83,6 +83,7 @@ export function PropertyTable({
       RETURNED: { className: 'bg-purple-100 text-purple-800 hover:bg-purple-100 border-purple-200' },
       UNDER_REVIEW: { className: 'bg-orange-100 text-orange-800 hover:bg-orange-100 border-orange-200' },
       DISPUTED: { className: 'bg-red-100 text-red-800 hover:bg-red-100 border-red-200' },
+      BANK_CUSTODY: { className: 'bg-teal-100 text-teal-800 hover:bg-teal-100 border-teal-200' },
     };
 
     const config = variants[status];
@@ -178,7 +179,7 @@ export function PropertyTable({
                 onClick={() => handleSort('area')}
                 className="h-auto p-0 font-semibold hover:bg-transparent hover:text-blue-600 transition-colors"
               >
-                Area (sqm)
+                Area
                 {getSortIcon('area')}
               </Button>
             </TableHead>
@@ -235,7 +236,7 @@ export function PropertyTable({
                 </div>
               </TableCell>
               <TableCell className="text-center font-semibold">
-                {formatArea(property.area)}
+                {formatArea(property.area)} (sqm)
               </TableCell>
               <TableCell>
                 <div className="flex items-center space-x-1 max-w-[150px]">

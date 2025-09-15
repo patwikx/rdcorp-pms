@@ -25,7 +25,7 @@ import {
 } from "@/components/ui/dropdown-menu"
 
 import type { BusinessUnitItem } from "@/types/business-unit-types"
-import { usePermissions } from "@/context/business-unit-context"
+import { useBusinessUnit } from "@/context/business-unit-context"
 
 interface BusinessUnitSwitcherProps {
   items: BusinessUnitItem[]
@@ -80,12 +80,15 @@ export default function BusinessUnitSwitcher({
   className, 
   items = [] 
 }: BusinessUnitSwitcherProps) {
-  const { canManageBusinessUnit } = usePermissions()
+  const { hasPermission } = useBusinessUnit()
   const params = useParams()
   const router = useRouter()
 
   const isSwitcherActive = items.length > 1
   const currentBusinessUnit = items.find((item) => item.id === params.businessUnitId)
+
+  // Check if user can manage business units (assuming there's a 'business-units' module)
+  const canManageBusinessUnit = hasPermission('business-units', 'canCreate')
 
   const onBusinessUnitSelect = (businessUnitId: string) => {
     router.push(`/${businessUnitId}`)

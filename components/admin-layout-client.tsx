@@ -37,7 +37,7 @@ import { ScrollArea } from '@/components/ui/scroll-area';
 import { Separator } from '@/components/ui/separator';
 
 import { BusinessUnitItem } from '@/types/business-unit-types';
-import { useCurrentBusinessUnit, usePermissions } from '@/context/business-unit-context';
+import { useBusinessUnit, useCurrentBusinessUnitRole } from '@/context/business-unit-context';
 import { useSession } from 'next-auth/react';
 
 interface AdminLayoutProps {
@@ -59,22 +59,22 @@ const mockNotifications = [
     title: 'Property approval pending',
     description: 'Title #TR-2024-001 requires approval',
     time: '2 minutes ago',
-    type: 'approval'
+    type: 'approval',
   },
   {
     id: '2',
     title: 'Property released',
     description: 'Property in Makati successfully released',
     time: '5 minutes ago',
-    type: 'release'
+    type: 'release',
   },
   {
     id: '3',
     title: 'Turnover completed',
     description: 'Property TR-001234 turnover completed',
     time: '10 minutes ago',
-    type: 'turnover'
-  }
+    type: 'turnover',
+  },
 ];
 
 const AdminLayoutClient: React.FC<AdminLayoutProps> = ({
@@ -86,8 +86,10 @@ const AdminLayoutClient: React.FC<AdminLayoutProps> = ({
   const router = useRouter();
   const { data: session } = useSession();
 
-  const { businessUnit } = useCurrentBusinessUnit();
-  const { isAdmin, userRole } = usePermissions();
+  // Use the correct hook from your new context
+  const { businessUnit, getRoleName } = useBusinessUnit();
+  const userRole = getRoleName();
+  const isAdmin = userRole === 'Admin';
 
   const [notificationsOpen, setNotificationsOpen] = useState(false);
 
@@ -95,23 +97,21 @@ const AdminLayoutClient: React.FC<AdminLayoutProps> = ({
     const pathSegments = pathname.split('/').filter(Boolean);
     const breadcrumbs: BreadcrumbItem[] = [];
 
-    // Skip business unit ID in breadcrumbs, start from meaningful segments
     for (let i = 1; i < pathSegments.length; i++) {
       const segment = pathSegments[i];
-      
-      // Skip the business unit ID segment
+
       if (segment === businessUnitId) continue;
-      
+
       const href = '/' + pathSegments.slice(0, i + 1).join('/');
       const label = segment
         .split('-')
         .map(word => word.charAt(0).toUpperCase() + word.slice(1))
         .join(' ');
 
-      breadcrumbs.push({ 
-        label, 
+      breadcrumbs.push({
+        label,
         href,
-        isLast: i === pathSegments.length - 1
+        isLast: i === pathSegments.length - 1,
       });
     }
 
@@ -119,7 +119,6 @@ const AdminLayoutClient: React.FC<AdminLayoutProps> = ({
   };
 
   const breadcrumbs = generateBreadcrumbs();
-  const currentBusinessUnit = businessUnits.find(unit => unit.id === businessUnitId);
 
   const getUserInitials = () => {
     const firstName = session?.user?.firstName || '';
@@ -149,10 +148,10 @@ const AdminLayoutClient: React.FC<AdminLayoutProps> = ({
             {/* Left Side - Business Unit Info and Breadcrumbs */}
             <div className="flex items-center space-x-6">
               {/* Business Unit Info */}
-              {currentBusinessUnit && (
+              {businessUnit && (
                 <div className="flex flex-col">
                   <h1 className="text-lg font-semibold tracking-tight">
-                    {currentBusinessUnit.name}
+                    {businessUnit.name}
                   </h1>
                   <div className="flex items-center space-x-2">
                     {isAdmin && (
@@ -166,7 +165,7 @@ const AdminLayoutClient: React.FC<AdminLayoutProps> = ({
                   </div>
                 </div>
               )}
-              
+
               {/* Breadcrumbs */}
               {breadcrumbs.length > 0 && (
                 <>
@@ -178,7 +177,7 @@ const AdminLayoutClient: React.FC<AdminLayoutProps> = ({
                           <Home className="h-4 w-4" />
                         </BreadcrumbLink>
                       </BreadcrumbItem>
-                      
+
                       {breadcrumbs.map((crumb, index) => (
                         <React.Fragment key={crumb.href}>
                           <BreadcrumbSeparator>
@@ -190,7 +189,7 @@ const AdminLayoutClient: React.FC<AdminLayoutProps> = ({
                                 {crumb.label}
                               </BreadcrumbPage>
                             ) : (
-                              <BreadcrumbLink 
+                              <BreadcrumbLink
                                 href={crumb.href}
                                 className="transition-colors hover:text-foreground"
                               >
@@ -209,13 +208,16 @@ const AdminLayoutClient: React.FC<AdminLayoutProps> = ({
             {/* Right Side - Actions */}
             <div className="flex items-center space-x-2">
               {/* Notifications */}
-              <DropdownMenu open={notificationsOpen} onOpenChange={setNotificationsOpen}>
+              <DropdownMenu
+                open={notificationsOpen}
+                onOpenChange={setNotificationsOpen}
+              >
                 <DropdownMenuTrigger asChild>
                   <Button variant="ghost" size="sm" className="relative">
                     <Bell className="h-4 w-4" />
                     {unreadNotifications > 0 && (
-                      <Badge 
-                        variant="destructive" 
+                      <Badge
+                        variant="destructive"
                         className="absolute -top-1 -right-1 h-5 w-5 rounded-full p-0 text-xs flex items-center justify-center"
                       >
                         {unreadNotifications > 9 ? '9+' : unreadNotifications}
@@ -233,15 +235,17 @@ const AdminLayoutClient: React.FC<AdminLayoutProps> = ({
                     )}
                   </DropdownMenuLabel>
                   <DropdownMenuSeparator />
-                  
+
                   <ScrollArea className="max-h-64">
-                    {mockNotifications.map((notification) => (
+                    {mockNotifications.map(notification => (
                       <DropdownMenuItem
                         key={notification.id}
                         className="flex flex-col items-start p-4 cursor-pointer"
                       >
                         <div className="space-y-1">
-                          <p className="text-sm font-medium">{notification.title}</p>
+                          <p className="text-sm font-medium">
+                            {notification.title}
+                          </p>
                           <p className="text-xs text-muted-foreground">
                             {notification.description}
                           </p>
@@ -252,7 +256,7 @@ const AdminLayoutClient: React.FC<AdminLayoutProps> = ({
                       </DropdownMenuItem>
                     ))}
                   </ScrollArea>
-                  
+
                   <DropdownMenuSeparator />
                   <DropdownMenuItem
                     onClick={() => router.push(`/${businessUnitId}/notifications`)}
@@ -264,8 +268,8 @@ const AdminLayoutClient: React.FC<AdminLayoutProps> = ({
               </DropdownMenu>
 
               {/* Settings */}
-              <Button 
-                variant="ghost" 
+              <Button
+                variant="ghost"
                 size="sm"
                 onClick={() => router.push(`/${businessUnitId}/settings`)}
               >
@@ -294,35 +298,35 @@ const AdminLayoutClient: React.FC<AdminLayoutProps> = ({
                       </p>
                     </div>
                   </DropdownMenuLabel>
-                  
+
                   <DropdownMenuSeparator />
-                  
-                  <DropdownMenuItem 
+
+                  <DropdownMenuItem
                     onClick={() => router.push(`/${businessUnitId}/profile`)}
                   >
                     <User className="mr-2 h-4 w-4" />
                     <span>Profile</span>
                   </DropdownMenuItem>
-                  
-                  <DropdownMenuItem 
+
+                  <DropdownMenuItem
                     onClick={() => router.push(`/${businessUnitId}/settings`)}
                   >
                     <Settings className="mr-2 h-4 w-4" />
                     <span>Settings</span>
                   </DropdownMenuItem>
-                  
+
                   {isAdmin && (
-                    <DropdownMenuItem 
+                    <DropdownMenuItem
                       onClick={() => router.push(`/${businessUnitId}/admin`)}
                     >
                       <UserCog className="mr-2 h-4 w-4" />
                       <span>Admin Panel</span>
                     </DropdownMenuItem>
                   )}
-                  
+
                   <DropdownMenuSeparator />
-                  
-                  <DropdownMenuItem 
+
+                  <DropdownMenuItem
                     onClick={handleLogout}
                     className="text-red-600 focus:text-red-600 focus:bg-red-50"
                   >
@@ -337,9 +341,7 @@ const AdminLayoutClient: React.FC<AdminLayoutProps> = ({
 
         {/* Main Content */}
         <main className="flex-1 overflow-y-auto bg-muted/10">
-          <div className="container mx-auto p-6">
-            {children}
-          </div>
+          <div className="container mx-auto p-6">{children}</div>
         </main>
       </div>
     </div>

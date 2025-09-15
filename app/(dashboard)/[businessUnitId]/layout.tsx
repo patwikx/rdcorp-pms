@@ -50,7 +50,7 @@ async function getBusinessUnitData(businessUnitId: string, userId: string) {
     }
   });
 
-  // Get user data with assignments
+  // Get user data with assignments - Updated to include proper RolePermissions
   const userData = await prisma.user.findUnique({
     where: { id: userId },
     select: {
@@ -70,7 +70,19 @@ async function getBusinessUnitData(businessUnitId: string, userId: string) {
               id: true,
               name: true,
               description: true,
-              permissions: true
+              level: true, // Include role level
+              permissions: {
+                select: {
+                  id: true,
+                  roleId: true,
+                  module: true,
+                  canCreate: true,
+                  canRead: true,
+                  canUpdate: true,
+                  canDelete: true,
+                  canApprove: true,
+                }
+              }
             }
           },
           businessUnit: {
@@ -89,7 +101,7 @@ async function getBusinessUnitData(businessUnitId: string, userId: string) {
     return null;
   }
 
-  // Transform the assignments to match the expected type
+  // Transform the assignments to match the expected type with proper RolePermissions
   const userAssignments: UserAssignment[] = userData.businessUnitMembers.map(member => ({
     businessUnitId: member.businessUnitId,
     roleId: member.roleId,
@@ -102,9 +114,8 @@ async function getBusinessUnitData(businessUnitId: string, userId: string) {
       id: member.role.id,
       name: member.role.name,
       description: member.role.description,
-      permissions: Array.isArray(member.role.permissions) 
-        ? (member.role.permissions as string[]) 
-        : [],
+      level: member.role.level,
+      permissions: member.role.permissions, // Now properly typed as RolePermission[]
     },
   }));
 

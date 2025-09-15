@@ -2,12 +2,25 @@
 import NextAuth, { type DefaultSession } from "next-auth";
 import { JWT } from "next-auth/jwt";
 
+// Define the structure for role permissions (matching your RolePermissions model)
+export interface RolePermission {
+  id: string;
+  roleId: string;
+  module: string; // e.g., "PROPERTY", "RPT", "USER_MANAGEMENT"
+  canCreate: boolean;
+  canRead: boolean;
+  canUpdate: boolean;
+  canDelete: boolean;
+  canApprove: boolean;
+}
+
 // Define the structure for a user's role within an assignment
 export interface UserAssignmentRole {
   id: string;
   name: string;
   description: string | null;
-  permissions: string[]; // JSON array of permission strings
+  level: number; // Role level from your schema
+  permissions: RolePermission[]; // Array of RolePermission objects
 }
 
 // Define the structure for a user's business unit within an assignment

@@ -20,12 +20,12 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
+import { useBusinessUnit } from '@/context/business-unit-context'
 
-import { useCurrentBusinessUnit } from '@/context/business-unit-context'
 
 export function UserProfileLogout() {
   const { data: session } = useSession()
-  const { businessUnitId } = useCurrentBusinessUnit()
+  const { businessUnitId } = useBusinessUnit()
   const router = useRouter()
 
   const handleLogout = async () => {
