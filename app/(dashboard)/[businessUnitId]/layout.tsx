@@ -6,7 +6,6 @@ import { BusinessUnitProvider } from "@/context/business-unit-context";
 import type { UserAssignment } from "@/next-auth";
 import { Sidebar } from "@/components/new-sidebar";
 
-
 interface BusinessUnitLayoutProps {
   children: React.ReactNode;
   params: Promise<{ businessUnitId: string }>;
@@ -167,7 +166,9 @@ export default async function BusinessUnitLayout({
           currentUser={data.currentUser}
         />
         <main className="flex-1 overflow-hidden">
-          {children}
+          <div className="h-full overflow-y-auto px-4 py-6">
+            {children}
+          </div>
         </main>
       </div>
     </BusinessUnitProvider>
