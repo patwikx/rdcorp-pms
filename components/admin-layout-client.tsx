@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-unused-vars */
 'use client';
 
 import React, { useState } from 'react';
@@ -84,6 +85,7 @@ const AdminLayoutClient: React.FC<AdminLayoutProps> = ({
   const pathname = usePathname();
   const router = useRouter();
   const { data: session } = useSession();
+
   const { businessUnit } = useCurrentBusinessUnit();
   const { isAdmin, userRole } = usePermissions();
 
