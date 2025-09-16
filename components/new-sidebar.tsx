@@ -125,14 +125,14 @@ const navigation: NavItem[] = [
     ],
   },
   {
-    title: "Property Workflow",
+    title: "Property Movement",
     icon: ArrowLeftRight,
     module: "PROPERTY",
     permission: "canRead",
     children: [
       { 
         title: "For Approval", 
-        href: "/approvals", 
+        href: "/property-movement/approvals", 
         icon: CheckCircle,
         module: "PROPERTY",
         permission: "canApprove",
@@ -140,21 +140,21 @@ const navigation: NavItem[] = [
       },
       { 
         title: "Releases", 
-        href: "/releases", 
+        href: "/property-movement/release", 
         icon: Send,
         module: "PROPERTY",
         permission: "canUpdate",
       },
       { 
         title: "Turnovers", 
-        href: "/turnovers", 
+        href: "/property-movement/turnovers", 
         icon: ArrowLeftRight,
         module: "PROPERTY",
         permission: "canUpdate",
       },
       { 
         title: "Returns", 
-        href: "/returns", 
+        href: "/property-movement/returns", 
         icon: RotateCcw,
         module: "PROPERTY",
         permission: "canUpdate",
