@@ -162,6 +162,28 @@ const navigation: NavItem[] = [
     ],
   },
   {
+    title: "Workflows",
+    icon: Settings,
+    module: "APPROVAL",
+    permission: "canRead",
+    children: [
+      { 
+        title: "All Workflows", 
+        href: "/workflows", 
+        icon: Settings,
+        module: "APPROVAL",
+        permission: "canRead",
+      },
+      { 
+        title: "Create Workflow", 
+        href: "/workflows/create", 
+        icon: Plus,
+        module: "APPROVAL",
+        permission: "canCreate",
+      },
+    ],
+  },
+  {
     title: "Reports & Analytics",
     icon: BarChart3,
     module: "REPORTS",
@@ -679,7 +701,7 @@ export function MobileSidebar({ businessUnitId, businessUnits, currentUser }: Si
     'Custodian', 
     'Manager', 
     'Approver', 
-    'System Admin'
+    'Administrator'
   ]) || hasPermission('USER_MANAGEMENT', 'canRead') || hasPermission('BUSINESS_UNITS', 'canRead')
 
   const handleNavigate = () => {

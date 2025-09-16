@@ -61,6 +61,7 @@ export function PropertyReleaseTable({
   sort,
   onSortChange,
   onViewRelease,
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   onApproveRelease,
   onCompleteRelease,
   onCancelRelease,
@@ -188,6 +189,7 @@ export function PropertyReleaseTable({
     return 'External';
   };
 
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const canApproveRelease = (release: PropertyReleaseListItem) => {
     return canApprove && release.status === TransactionStatus.PENDING;
   };
@@ -331,12 +333,15 @@ export function PropertyReleaseTable({
                       <Eye className="mr-2 h-4 w-4 text-blue-600" />
                       View Details
                     </DropdownMenuItem>
+
+                    {/*
                     {canApproveRelease(release) && (
                       <DropdownMenuItem onClick={() => onApproveRelease(release.id)}>
                         <CheckCircle className="mr-2 h-4 w-4 text-green-600" />
                         Approve Release
                       </DropdownMenuItem>
                     )}
+                      */}
                     {canCompleteRelease(release) && (
                       <DropdownMenuItem onClick={() => onCompleteRelease(release.id)}>
                         <CheckCircle className="mr-2 h-4 w-4 text-blue-600" />
