@@ -92,7 +92,7 @@ export interface NavItem {
 const navigation: NavItem[] = [
   {
     title: "Dashboard",
-    href: "/dashboard",
+    href: "/",
     icon: LayoutDashboard,
   },
   {
@@ -197,8 +197,8 @@ const navigation: NavItem[] = [
         permission: "canRead",
       },
       { 
-        title: "Workflow Reports", 
-        href: "/reports/workflow", 
+        title: "Property Movement Reports", 
+        href: "/reports/property-movement", 
         icon: Activity,
         module: "REPORTS",
         permission: "canRead",

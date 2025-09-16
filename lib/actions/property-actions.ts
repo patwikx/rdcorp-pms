@@ -1,5 +1,4 @@
-// lib/actions/property-actions.ts
-'use server';
+'use server'
 
 import { prisma } from '@/lib/prisma';
 import { auth } from '@/auth';
@@ -14,27 +13,48 @@ import type {
   PropertyStats 
 } from '@/types/property-types';
 
-// Helper function to convert Decimal fields to numbers
-function convertDecimalsToNumbers<T>(obj: T): T {
-  if (!obj) return obj;
-  
-  if (Array.isArray(obj)) {
-    return obj.map(convertDecimalsToNumbers) as T;
-  }
-  
-  if (typeof obj === 'object' && obj.constructor?.name === 'Decimal') {
-    return Number(obj) as T;
-  }
-  
-  if (typeof obj === 'object') {
-    const converted = {} as T;
-    for (const [key, value] of Object.entries(obj)) {
-      (converted as Record<string, unknown>)[key] = convertDecimalsToNumbers(value);
+// Check if value is a Decimal object
+function isDecimal(value: unknown): boolean {
+  return value !== null && 
+         typeof value === 'object' && 
+         (value.constructor?.name === 'Decimal' ||
+          'toNumber' in value ||
+          'd' in value);
+}
+
+
+// Alternative serialization function for complete safety
+function serializeForClient<T>(obj: T): T {
+  const jsonString = JSON.stringify(obj, (key: string, value: unknown) => {
+    // Convert Decimals to numbers
+    if (isDecimal(value)) {
+      return Number(value);
     }
-    return converted;
-  }
-  
-  return obj;
+    
+    // Convert Dates to ISO strings
+    if (value instanceof Date) {
+      return value.toISOString();
+    }
+    
+    // Remove any functions
+    if (typeof value === 'function') {
+      return undefined;
+    }
+    
+    return value;
+  });
+
+  return JSON.parse(jsonString, (key: string, value: unknown) => {
+    // Convert ISO date strings back to Date objects for specific fields
+    if (typeof value === 'string' && (
+      key.endsWith('At') || 
+      key.endsWith('Date') || 
+      key === 'dateOfBirth'
+    )) {
+      return new Date(value);
+    }
+    return value;
+  }) as T;
 }
 
 // Get properties with pagination and filtering
@@ -135,9 +155,9 @@ export async function getProperties(
 
     const totalPages = Math.ceil(totalCount / limit);
 
-    // Transform the data and convert Decimals to numbers
+    // Use the safer serialization method
     const transformedProperties: PropertyListItem[] = properties.map(property => 
-      convertDecimalsToNumbers({
+      serializeForClient({
         ...property,
         area: Number(property.area), // Explicit conversion for area
       })
@@ -301,8 +321,8 @@ export async function getPropertyById(
       return null;
     }
 
-    // Transform the data and convert all Decimals to numbers
-    const transformedProperty: PropertyDetails = convertDecimalsToNumbers({
+    // Use the safer serialization method
+    const transformedProperty: PropertyDetails = serializeForClient({
       ...property,
       area: Number(property.area), // Explicit conversion for area
     });
@@ -490,7 +510,7 @@ export async function createProperty(
         entityId: property.id,
         propertyId: property.id,
         userId: session.user.id,
-        newValues: convertDecimalsToNumbers({ ...data }),
+        newValues: serializeForClient({ ...data }),
       },
     });
 
@@ -561,8 +581,8 @@ export async function updateProperty(
         entityId: propertyId,
         propertyId: propertyId,
         userId: session.user.id,
-        oldValues: convertDecimalsToNumbers({ ...existingProperty }),
-        newValues: convertDecimalsToNumbers({ ...updatedProperty }),
+        oldValues: serializeForClient({ ...existingProperty }),
+        newValues: serializeForClient({ ...updatedProperty }),
       },
     });
 
@@ -640,7 +660,7 @@ export async function deleteProperty(
         entityId: propertyId,
         propertyId: propertyId,
         userId: session.user.id,
-        oldValues: convertDecimalsToNumbers({ ...existingProperty }),
+        oldValues: serializeForClient({ ...existingProperty }),
       },
     });
 

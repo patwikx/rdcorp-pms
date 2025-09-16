@@ -24,6 +24,7 @@ import type {
   UserAssignmentListItem,
   UserFilterOptions,
   UserAssignmentFilterOptions,
+  UserAssignmentDetails,
 } from '@/types/user-management-types';
 
 // Get users with pagination and filtering
@@ -1148,5 +1149,155 @@ export async function findUserForAssignment(
   } catch (error) {
     console.error('Error finding user for assignment:', error);
     throw new Error('Failed to find user');
+  }
+}
+
+// Get user assignment by IDs
+export async function getUserAssignmentById(
+  businessUnitId: string,
+  userId: string,
+  targetBusinessUnitId: string
+): Promise<UserAssignmentDetails | null> {
+  const session = await auth();
+  if (!session?.user?.id) {
+    throw new Error('Unauthorized');
+  }
+
+  const hasAccess = session.user.assignments?.some(
+    assignment => assignment.businessUnitId === businessUnitId
+  );
+  if (!hasAccess) {
+    throw new Error('Access denied to this business unit');
+  }
+
+  try {
+    const assignment = await prisma.businessUnitMember.findUnique({
+      where: {
+        userId_businessUnitId: {
+          userId,
+          businessUnitId: targetBusinessUnitId,
+        },
+      },
+      include: {
+        user: {
+          include: {
+            businessUnitMembers: {
+              include: {
+                role: {
+                  include: {
+                    permissions: true,
+                  },
+                },
+                businessUnit: true,
+              },
+            },
+            _count: {
+              select: {
+                businessUnitMembers: true,
+                createdProperties: true,
+                updatedProperties: true,
+                releases: true,
+                turnovers: true,
+                returns: true,
+                auditLogs: true,
+                createdDocuments: true,
+              },
+            },
+          },
+        },
+        role: {
+          include: {
+            permissions: true,
+          },
+        },
+        businessUnit: true,
+      },
+    });
+
+    return assignment as UserAssignmentDetails | null;
+  } catch (error) {
+    console.error('Error fetching user assignment:', error);
+    throw new Error('Failed to fetch user assignment details');
+  }
+}
+
+// Update user assignment
+export async function updateUserAssignment(
+  businessUnitId: string,
+  data: UserAssignmentFormData
+): Promise<AssignmentActionResult> {
+  const session = await auth();
+  if (!session?.user?.id) {
+    return { success: false, error: 'Unauthorized' };
+  }
+
+  const hasAccess = session.user.assignments?.some(
+    assignment => assignment.businessUnitId === businessUnitId
+  );
+  if (!hasAccess) {
+    return { success: false, error: 'Access denied to this business unit' };
+  }
+
+  try {
+    // Verify the assignment exists
+    const existingAssignment = await prisma.businessUnitMember.findUnique({
+      where: {
+        userId_businessUnitId: {
+          userId: data.userId,
+          businessUnitId: data.businessUnitId,
+        },
+      },
+    });
+
+    if (!existingAssignment) {
+      return { success: false, error: 'User assignment not found' };
+    }
+
+    // Verify role exists
+    const role = await prisma.role.findUnique({
+      where: { id: data.roleId },
+    });
+
+    if (!role) {
+      return { success: false, error: 'Role not found' };
+    }
+
+    // Update the assignment
+    await prisma.businessUnitMember.update({
+      where: {
+        userId_businessUnitId: {
+          userId: data.userId,
+          businessUnitId: data.businessUnitId,
+        },
+      },
+      data: {
+        roleId: data.roleId,
+        updatedAt: new Date(),
+      },
+    });
+
+    // Create audit log entry
+    await prisma.auditLog.create({
+      data: {
+        action: 'UPDATE',
+        entity: 'BusinessUnitMember',
+        entityId: `${data.userId}-${data.businessUnitId}`,
+        userId: session.user.id,
+        oldValues: {
+          roleId: existingAssignment.roleId,
+        },
+        newValues: {
+          roleId: data.roleId,
+        },
+      },
+    });
+
+    revalidatePath(`/${businessUnitId}/users`);
+    revalidatePath(`/${businessUnitId}/users/assignments`);
+    revalidatePath(`/${businessUnitId}/roles`);
+    return { success: true };
+  } catch (error) {
+    console.error('Error updating user assignment:', error);
+    return { success: false, error: 'Failed to update user assignment' };
   }
 }

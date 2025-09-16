@@ -210,6 +210,13 @@ export interface UserAssignmentDetails extends BusinessUnitMemberWithDetails {
   user: UserDetails;
 }
 
+// User assignment details for editing
+export interface UserAssignmentDetails extends BusinessUnitMember {
+  user: UserDetails;
+  role: RoleWithPermissions;
+  businessUnit: BusinessUnitSubset;
+}
+
 // Filter options
 export interface UserFilterOptions {
   roles: Array<{ id: string; name: string; count: number }>;

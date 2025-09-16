@@ -1,24 +1,20 @@
-
-
-// app/(dashboard)/[businessUnitId]/properties/[id]/page.tsx
+// app/(dashboard)/[businessUnitId]/users/[id]/page.tsx
 import React from 'react';
 import { redirect, notFound } from 'next/navigation';
 import { auth } from '@/auth';
-import { getPropertyById } from '@/lib/actions/property-actions';
-// Import the new data fetching actions for banks and custodians
+import { getUserById } from '@/lib/actions/user-management-actions';
+import { getAllRoles } from '@/lib/actions/role-actions';
 
-import { PropertyDetailEditPage } from '@/components/properties/property-detail-edit-page';
 import { Breadcrumb, BreadcrumbItem, BreadcrumbLink, BreadcrumbList, BreadcrumbPage, BreadcrumbSeparator } from '@/components/ui/breadcrumb';
 import Link from 'next/link';
-import { Building2, Eye, Home } from 'lucide-react';
-import { getBanks } from '@/lib/actions/bank-actions';
-import { getCustodians } from '@/lib/actions/custodian-actions';
+import { Users, Eye, Home } from 'lucide-react';
+import { UserDetailEditPage } from '@/components/users/user-details-edit-page';
 
-interface EditPropertyPageProps {
+interface EditUserPageProps {
   params: Promise<{ businessUnitId: string; id: string }>;
 }
 
-export default async function EditPropertyPage({ params }: EditPropertyPageProps) {
+export default async function EditUserPage({ params }: EditUserPageProps) {
   const session = await auth();
 
   if (!session?.user?.id) {
@@ -36,14 +32,13 @@ export default async function EditPropertyPage({ params }: EditPropertyPageProps
     redirect('/setup?error=unauthorized');
   }
 
-  // Fetch all necessary data concurrently to improve performance
-  const [property, availableBanks, availableCustodians] = await Promise.all([
-    getPropertyById(businessUnitId, id),
-    getBanks(),
-    getCustodians(),
+  // Fetch user and available roles concurrently
+  const [user, availableRoles] = await Promise.all([
+    getUserById(businessUnitId, id),
+    getAllRoles(),
   ]);
 
-  if (!property) {
+  if (!user) {
     notFound();
   }
 
@@ -63,9 +58,9 @@ export default async function EditPropertyPage({ params }: EditPropertyPageProps
             <BreadcrumbSeparator />
             <BreadcrumbItem>
               <BreadcrumbLink asChild>
-                <Link href={`/${businessUnitId}/properties`} className="flex items-center gap-1 text-sm text-slate-600 hover:text-blue-600 transition-colors">
-                  <Building2 className="h-3 w-3" />
-                  Properties
+                <Link href={`/${businessUnitId}/users`} className="flex items-center gap-1 text-sm text-slate-600 hover:text-blue-600 transition-colors">
+                  <Users className="h-3 w-3" />
+                  User Management
                 </Link>
               </BreadcrumbLink>
             </BreadcrumbItem>
@@ -73,7 +68,7 @@ export default async function EditPropertyPage({ params }: EditPropertyPageProps
             <BreadcrumbItem>
               <BreadcrumbPage className="flex items-center gap-1 text-sm text-slate-900 font-semibold">
                 <Eye className="h-4 w-4" />
-                {property.titleNumber}
+                {user.firstName} {user.lastName}
               </BreadcrumbPage>
             </BreadcrumbItem>
           </BreadcrumbList>
@@ -84,19 +79,18 @@ export default async function EditPropertyPage({ params }: EditPropertyPageProps
       <div className="mb-8">
         <div className="flex items-center justify-between">
           <div>
-            <h1 className="text-3xl font-bold tracking-tight">Edit Property</h1>
+            <h1 className="text-3xl font-bold tracking-tight">Edit User</h1>
             <p className="text-muted-foreground mt-2">
-              Update property information and details for <span className="font-medium">{property.titleNumber}</span>
+              Update user information and manage assignments for <span className="font-medium">{user.firstName} {user.lastName}</span>
             </p>
           </div>
         </div>
       </div>
 
-      <PropertyDetailEditPage
+      <UserDetailEditPage
         businessUnitId={businessUnitId}
-        property={property}
-        availableBanks={availableBanks}
-        availableCustodians={availableCustodians}
+        user={user}
+        availableRoles={availableRoles}
       />
     </div>
   );

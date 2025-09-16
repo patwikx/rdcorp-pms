@@ -1,24 +1,18 @@
-
-
-// app/(dashboard)/[businessUnitId]/properties/[id]/page.tsx
+// app/(dashboard)/[businessUnitId]/roles/[id]/page.tsx
 import React from 'react';
 import { redirect, notFound } from 'next/navigation';
 import { auth } from '@/auth';
-import { getPropertyById } from '@/lib/actions/property-actions';
-// Import the new data fetching actions for banks and custodians
-
-import { PropertyDetailEditPage } from '@/components/properties/property-detail-edit-page';
+import { getRoleById } from '@/lib/actions/role-actions';
 import { Breadcrumb, BreadcrumbItem, BreadcrumbLink, BreadcrumbList, BreadcrumbPage, BreadcrumbSeparator } from '@/components/ui/breadcrumb';
 import Link from 'next/link';
-import { Building2, Eye, Home } from 'lucide-react';
-import { getBanks } from '@/lib/actions/bank-actions';
-import { getCustodians } from '@/lib/actions/custodian-actions';
+import { Shield, Eye, Home } from 'lucide-react';
+import { RoleDetailEditPage } from '@/components/roles/role-detail-edit-page';
 
-interface EditPropertyPageProps {
+interface EditRolePageProps {
   params: Promise<{ businessUnitId: string; id: string }>;
 }
 
-export default async function EditPropertyPage({ params }: EditPropertyPageProps) {
+export default async function EditRolePage({ params }: EditRolePageProps) {
   const session = await auth();
 
   if (!session?.user?.id) {
@@ -36,14 +30,10 @@ export default async function EditPropertyPage({ params }: EditPropertyPageProps
     redirect('/setup?error=unauthorized');
   }
 
-  // Fetch all necessary data concurrently to improve performance
-  const [property, availableBanks, availableCustodians] = await Promise.all([
-    getPropertyById(businessUnitId, id),
-    getBanks(),
-    getCustodians(),
-  ]);
+  // Fetch role details
+  const role = await getRoleById(businessUnitId, id);
 
-  if (!property) {
+  if (!role) {
     notFound();
   }
 
@@ -63,9 +53,9 @@ export default async function EditPropertyPage({ params }: EditPropertyPageProps
             <BreadcrumbSeparator />
             <BreadcrumbItem>
               <BreadcrumbLink asChild>
-                <Link href={`/${businessUnitId}/properties`} className="flex items-center gap-1 text-sm text-slate-600 hover:text-blue-600 transition-colors">
-                  <Building2 className="h-3 w-3" />
-                  Properties
+                <Link href={`/${businessUnitId}/roles`} className="flex items-center gap-1 text-sm text-slate-600 hover:text-blue-600 transition-colors">
+                  <Shield className="h-3 w-3" />
+                  Roles & Permissions
                 </Link>
               </BreadcrumbLink>
             </BreadcrumbItem>
@@ -73,7 +63,7 @@ export default async function EditPropertyPage({ params }: EditPropertyPageProps
             <BreadcrumbItem>
               <BreadcrumbPage className="flex items-center gap-1 text-sm text-slate-900 font-semibold">
                 <Eye className="h-4 w-4" />
-                {property.titleNumber}
+                {role.name}
               </BreadcrumbPage>
             </BreadcrumbItem>
           </BreadcrumbList>
@@ -84,19 +74,17 @@ export default async function EditPropertyPage({ params }: EditPropertyPageProps
       <div className="mb-8">
         <div className="flex items-center justify-between">
           <div>
-            <h1 className="text-3xl font-bold tracking-tight">Edit Property</h1>
+            <h1 className="text-3xl font-bold tracking-tight">Edit Role</h1>
             <p className="text-muted-foreground mt-2">
-              Update property information and details for <span className="font-medium">{property.titleNumber}</span>
+              Update role information and permissions for <span className="font-medium">{role.name}</span>
             </p>
           </div>
         </div>
       </div>
 
-      <PropertyDetailEditPage
+      <RoleDetailEditPage
         businessUnitId={businessUnitId}
-        property={property}
-        availableBanks={availableBanks}
-        availableCustodians={availableCustodians}
+        role={role}
       />
     </div>
   );
